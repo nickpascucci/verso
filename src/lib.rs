@@ -1,6 +1,10 @@
+use serde::{Deserialize, Serialize};
+use serde_json;
+
 use std::error::Error;
 use std::fmt;
 use std::fs;
+use std::io;
 
 // Blocks are opened by using the form @!<id>. For example: @!202001171309.
 // The ID can be any set of characters terminated by whitespace.
@@ -22,42 +26,52 @@ impl Config {
 }
 
 pub fn run(cfg: Config) -> Result<(), Box<dyn Error>>{
-    let annotations: Vec<(String, Vec<Fragment>)> = vec![];
+    let mut annotations: Vec<Fragment> = vec![];
+
+    // Do the read and print in separate passes to enable clean error messages.
     for filename in cfg.filenames {
-        let contents = fs::read_to_string(filename)?;
-        let fragments = extract_fragments(contents)?;
-        annotations.push((filename, fragments));
+        let contents = fs::read_to_string(filename.clone())?;
+        let mut fragments = extract_fragments(contents, filename)?;
+        annotations.append(&mut fragments);
     }
+
+    serde_json::to_writer(io::stdout(), &annotations)?;
 
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 struct Fragment {
     body: String,
     id: String,
+    file: String,
+    line: usize,
+    col: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum ParseError {
-    DoubleOpen{line: usize, col: usize},
-    CloseBeforeOpen{line: usize, col: usize},
-    MissingId{line: usize, col: usize},
+enum ParseErrorType {
+    DoubleOpen,
+    CloseBeforeOpen,
+    MissingId,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+struct ParseError {
+    err_type: ParseErrorType,
+    line: usize,
+    col: usize
 }
 
 impl Error for ParseError {}
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, match self {
-            DoubleOpen => ,
-            CloseBeforeOpen => ,
-            MissingId => ,
-        });
+        write!(f, "{:?}: line {}, column {}", self.err_type, self.line, self.col)
     }
 }
 
-fn extract_fragments(contents: String) -> Result<Vec<Fragment>, ParseError> {
+fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>, ParseError> {
     let mut fragments: Vec<Fragment> = vec![];
 
     let mut fragment: Option<Fragment> = None;
@@ -66,7 +80,7 @@ fn extract_fragments(contents: String) -> Result<Vec<Fragment>, ParseError> {
         match &fragment {
             None => {
                 if let Some(col) = content.find(BLOCK_CLOSE_SYMBOL) {
-                    return Err(ParseError::CloseBeforeOpen{ line, col });
+                    return Err(ParseError { err_type: ParseErrorType::CloseBeforeOpen, line, col });
                 }
 
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
@@ -74,10 +88,14 @@ fn extract_fragments(contents: String) -> Result<Vec<Fragment>, ParseError> {
                     if let Some(id) = extract_id(content, col + BLOCK_OPEN_SYMBOL.len()) {
                         fragment = Some(Fragment {
                             body: String::new(),
-                            id
+                            id,
+                            // The fragment to extract starts at the beginning of the next line.
+                            line: line + 1,
+                            col: 0,
+                            file: filename.clone()
                         });
                     } else {
-                        return Err(ParseError::MissingId{ line, col });
+                        return Err(ParseError { err_type: ParseErrorType::MissingId, line, col });
                     }
                 }
             },
@@ -90,7 +108,7 @@ fn extract_fragments(contents: String) -> Result<Vec<Fragment>, ParseError> {
                 }
 
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
-                    return Err(ParseError::DoubleOpen{ line, col });
+                    return Err(ParseError{ err_type: ParseErrorType::DoubleOpen, line, col });
                 }
 
                 // If there no markers, append the line to the existing fragment.
@@ -100,7 +118,7 @@ fn extract_fragments(contents: String) -> Result<Vec<Fragment>, ParseError> {
                     } else {
                         x.body + "\n" + content
                     },
-                    id: x.id
+                    ..x
                 });
             },
         }
