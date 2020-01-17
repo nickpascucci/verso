@@ -91,7 +91,7 @@ _(Conveniently, the `verso` program goes on the left of the pipe while `recto` g
 > on the "back" side of a leaf of paper in a bound item such as a codex, book, broadsheet, or
 > pamphlet.
 
-_(Wikipedia - Recto and Verso)[https://en.wikipedia.org/wiki/Recto_and_verso]_
+_[Wikipedia - Recto and Verso](https://en.wikipedia.org/wiki/Recto_and_verso)_
 
 ## Future Work
 
