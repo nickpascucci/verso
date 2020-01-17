@@ -1,47 +1,15 @@
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use std::error::Error;
 use std::fmt;
-use std::fs;
-use std::io;
 
 // Blocks are opened by using the form @!<id>. For example: @!202001171309.
 // The ID can be any set of characters terminated by whitespace.
 const BLOCK_OPEN_SYMBOL: &'static str = "@!";
 const BLOCK_CLOSE_SYMBOL: &'static str = "!@";
 
-#[derive(Debug,PartialEq)]
-pub struct Config {
-    pub filenames: Vec<String>,
-}
-
-impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
-
-        let filenames = args[1..].iter().cloned().collect();
-
-        Ok(Config { filenames })
-    }
-}
-
-pub fn run(cfg: Config) -> Result<(), Box<dyn Error>>{
-    let mut annotations: Vec<Fragment> = vec![];
-
-    // Do the read and print in separate passes to enable clean error messages.
-    for filename in cfg.filenames {
-        let contents = fs::read_to_string(filename.clone())?;
-        let mut fragments = extract_fragments(contents, filename)?;
-        annotations.append(&mut fragments);
-    }
-
-    serde_json::to_writer(io::stdout(), &annotations)?;
-
-    Ok(())
-}
-
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-struct Fragment {
+pub struct Fragment {
     body: String,
     id: String,
     file: String,
@@ -57,30 +25,38 @@ enum ParseErrorType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct ParseError {
+pub struct ParseError {
     err_type: ParseErrorType,
     line: usize,
-    col: usize
+    col: usize,
 }
 
 impl Error for ParseError {}
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}: line {}, column {}", self.err_type, self.line, self.col)
+        write!(
+            f,
+            "{:?}: line {}, column {}",
+            self.err_type, self.line, self.col
+        )
     }
 }
 
-fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>, ParseError> {
+pub fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>, ParseError> {
     let mut fragments: Vec<Fragment> = vec![];
 
     let mut fragment: Option<Fragment> = None;
 
-    for (line, content) in contents.split("\n").enumerate().map(|(l, c)| (l+1, c)) {
+    for (line, content) in contents.split("\n").enumerate().map(|(l, c)| (l + 1, c)) {
         match &fragment {
             None => {
                 if let Some(col) = content.find(BLOCK_CLOSE_SYMBOL) {
-                    return Err(ParseError { err_type: ParseErrorType::CloseBeforeOpen, line, col });
+                    return Err(ParseError {
+                        err_type: ParseErrorType::CloseBeforeOpen,
+                        line,
+                        col,
+                    });
                 }
 
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
@@ -92,13 +68,17 @@ fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>
                             // The fragment to extract starts at the beginning of the next line.
                             line: line + 1,
                             col: 0,
-                            file: filename.clone()
+                            file: filename.clone(),
                         });
                     } else {
-                        return Err(ParseError { err_type: ParseErrorType::MissingId, line, col });
+                        return Err(ParseError {
+                            err_type: ParseErrorType::MissingId,
+                            line,
+                            col,
+                        });
                     }
                 }
-            },
+            }
 
             Some(f) => {
                 // If the line contains an end marker, end the fragment if one exists.
@@ -108,7 +88,11 @@ fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>
                 }
 
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
-                    return Err(ParseError{ err_type: ParseErrorType::DoubleOpen, line, col });
+                    return Err(ParseError {
+                        err_type: ParseErrorType::DoubleOpen,
+                        line,
+                        col,
+                    });
                 }
 
                 // If there no markers, append the line to the existing fragment.
@@ -120,7 +104,7 @@ fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>
                     },
                     ..x
                 });
-            },
+            }
         }
     }
 
@@ -173,7 +157,8 @@ mod tests {
 
     #[test]
     fn test_extract_fragments() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(String::from("# This is an example
+        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(String::from(
+            "# This is an example
 import sys
 
 # @!foo-bar-baz The fragment starts and its ID is defined on this line; it is foo-bar-baz.
@@ -181,14 +166,30 @@ def main():
     do_stuff()
     make_awesome()
     # !@ This line ends the fragment.
-    sys.exit(1) # oops"));
+    sys.exit(1) # oops",
+        ));
 
         let fragments = fragments.expect("Expected no parse errors");
-        assert!(fragments.len() == 1, "Expected one fragment, found {}", fragments.len());
-        assert!(fragments[0].body == String::from("def main():
+        assert!(
+            fragments.len() == 1,
+            "Expected one fragment, found {}",
+            fragments.len()
+        );
+        assert!(
+            fragments[0].body
+                == String::from(
+                    "def main():
     do_stuff()
-    make_awesome()"), "Unexpected code fragment {:?}", fragments[0].body);
-        assert!(fragments[0].id == String::from("foo-bar-baz"), "Unexpected ID {:?}", fragments[0].id);
+    make_awesome()"
+                ),
+            "Unexpected code fragment {:?}",
+            fragments[0].body
+        );
+        assert!(
+            fragments[0].id == String::from("foo-bar-baz"),
+            "Unexpected ID {:?}",
+            fragments[0].id
+        );
     }
 
     #[test]
@@ -199,15 +200,16 @@ def main():
 # !@ This is an error on line 3.
 012345 The error is at column 2.
 # @! This begins the fragment.
-# !@ This line ends the fragment."));
+# !@ This line ends the fragment.",
+        ));
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError::CloseBeforeOpen{line, col} => {
+            ParseError::CloseBeforeOpen { line, col } => {
                 assert!(line == 3, "Expected error on line 3, found line {:?}", line);
                 assert!(col == 2, "Expected error on col 2, found col {:?}", col);
             }
-            _ => panic!("Expected ParseError::CloseBeforeOpen, got {:?}", fragments)
+            _ => panic!("Expected ParseError::CloseBeforeOpen, got {:?}", fragments),
         }
     }
 
@@ -218,15 +220,16 @@ def main():
 # @!foo-bar-baz This begins the fragment.
 # @! This is an error on line 3.
 012345 The error is at column 2.
-# !@ This line ends the fragment."));
+# !@ This line ends the fragment.",
+        ));
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError::DoubleOpen{line, col} => {
+            ParseError::DoubleOpen { line, col } => {
                 assert!(line == 3, "Expected error on line 3, found line {:?}", line);
                 assert!(col == 2, "Expected error on col 2, found col {:?}", col);
             }
-            _ => panic!("Expected ParseError::DoubleOpen, got {:?}", fragments)
+            _ => panic!("Expected ParseError::DoubleOpen, got {:?}", fragments),
         }
     }
 
@@ -237,15 +240,16 @@ def main():
 
 # @! This is an error on line 3: No ID.
 012345 The error is at column 2.
-# !@ This line ends the fragment."));
+# !@ This line ends the fragment.",
+        ));
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError::MissingId{line, col} => {
+            ParseError::MissingId { line, col } => {
                 assert!(line == 3, "Expected error on line 3, found line {:?}", line);
                 assert!(col == 2, "Expected error on col 2, found col {:?}", col);
             }
-            _ => panic!("Expected ParseError::MissingId, got {:?}", fragments)
+            _ => panic!("Expected ParseError::MissingId, got {:?}", fragments),
         }
     }
 }
