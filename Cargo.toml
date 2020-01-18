@@ -4,7 +4,17 @@ version = "0.1.0"
 authors = ["Nick Pascucci <ndpi@alum.mit.edu>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "A literate programming tool that does things a little differently."
+repository = "https://github.com/nickpascucci/verso"
+readme = "README.md"
+
+license = "GPL-3.0-only"
+
+keywords = ["literate-programming"]
+categories = ["command-line-utilities", "development-tools"]
+
+[badges]
+maintenance = { status = "experimental" }
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
