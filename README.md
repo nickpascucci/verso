@@ -97,3 +97,4 @@ _[Wikipedia - Recto and Verso](https://en.wikipedia.org/wiki/Recto_and_verso)_
 
 - Add support for allow overlapping annotations.
 - Add support for custom formatting of annotation properties within the woven output.
+- Paralellize file processing in Verso, and both reading from `stdin` and file reading in Recto.
