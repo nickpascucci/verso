@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use std::error::Error;
@@ -7,33 +8,40 @@ use std::fmt;
 // The ID can be any set of characters terminated by whitespace.
 const BLOCK_OPEN_SYMBOL: &'static str = "@!";
 const BLOCK_CLOSE_SYMBOL: &'static str = "!@";
+const INSERTION_SYMBOL: &'static str = "@@";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Fragment {
-    body: String,
-    id: String,
-    file: String,
-    line: usize,
-    col: usize,
+    pub body: String,
+    pub id: String,
+    pub file: String,
+    pub line: usize,
+    pub col: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum ParseErrorType {
+pub enum ParseError {
     DoubleOpen,
     CloseBeforeOpen,
     MissingId,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ParseError {
-    err_type: ParseErrorType,
+pub enum WeaveError {
+    MissingFragment(String),
+    MissingId,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct FileError<T: fmt::Debug> {
+    err_type: T,
     line: usize,
     col: usize,
 }
 
-impl Error for ParseError {}
+impl<T: fmt::Debug> Error for FileError<T> {}
 
-impl fmt::Display for ParseError {
+impl<T: fmt::Debug> fmt::Display for FileError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -43,7 +51,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>, ParseError> {
+pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>, FileError<ParseError>> {
     let mut fragments: Vec<Fragment> = vec![];
 
     let mut fragment: Option<Fragment> = None;
@@ -52,8 +60,8 @@ pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>
         match &fragment {
             None => {
                 if let Some(col) = content.find(BLOCK_CLOSE_SYMBOL) {
-                    return Err(ParseError {
-                        err_type: ParseErrorType::CloseBeforeOpen,
+                    return Err(FileError {
+                        err_type: ParseError::CloseBeforeOpen,
                         line,
                         col,
                     });
@@ -71,8 +79,8 @@ pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>
                             file: filename.to_owned(),
                         });
                     } else {
-                        return Err(ParseError {
-                            err_type: ParseErrorType::MissingId,
+                        return Err(FileError {
+                            err_type: ParseError::MissingId,
                             line,
                             col,
                         });
@@ -88,8 +96,8 @@ pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>
                 }
 
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
-                    return Err(ParseError {
-                        err_type: ParseErrorType::DoubleOpen,
+                    return Err(FileError {
+                        err_type: ParseError::DoubleOpen,
                         line,
                         col,
                     });
@@ -119,6 +127,40 @@ fn extract_id(content: &str, col: usize) -> Option<String> {
     } else {
         Some(id)
     }
+}
+
+fn weave(contents: &str, annotations: HashMap<String, Fragment>) -> Result<String, FileError<WeaveError>> {
+    let mut substrings: Vec<String> = vec![];
+
+    for (line_no, line) in contents.lines().enumerate() {
+        if line.starts_with(INSERTION_SYMBOL) {
+            let id = extract_id(line, INSERTION_SYMBOL.len());
+            match id {
+                Some(id) => {
+                    let fragment = annotations.get(&id);
+                    match fragment {
+                        // TODO Add indexing information.
+                        Some(f) => substrings.push(f.body.to_owned()),
+                        None => return Err(FileError{
+                            err_type: WeaveError::MissingFragment(id.to_owned()),
+                            line: line_no,
+                            col: INSERTION_SYMBOL.len(),
+                        }),
+                    }
+                    
+                },
+                None => return Err(FileError {
+                    err_type: WeaveError::MissingId,
+                    line: line_no,
+                    col: 0,
+                }),
+            }
+        } else {
+            substrings.push(line.to_owned());
+        }
+    }
+
+    return Ok(substrings.join("\n"));
 }
 
 #[cfg(test)]
@@ -157,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_extract_fragments() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
+        let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example
 import sys
 
@@ -193,7 +235,7 @@ def main():
 
     #[test]
     fn test_extract_fragments_close_before_open() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
+        let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
 
 # !@ This is an error on line 3.
@@ -203,7 +245,7 @@ def main():
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError { err_type: ParseErrorType::CloseBeforeOpen, line, col, .. } => {
+            FileError { err_type: ParseError::CloseBeforeOpen, line, col, .. } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
@@ -213,7 +255,7 @@ def main():
 
     #[test]
     fn test_extract_fragments_double_open() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
+        let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
 # @!foo-bar-baz This begins the fragment.
 # @! This is an error on line 3.
@@ -222,7 +264,7 @@ def main():
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError { err_type: ParseErrorType::DoubleOpen, line, col, .. } => {
+            FileError { err_type: ParseError::DoubleOpen, line, col, .. } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
@@ -233,7 +275,7 @@ def main():
 
     #[test]
     fn test_extract_fragments_missing_id() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
+        let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
 
 # @! This is an error on line 3: No ID.
@@ -242,11 +284,51 @@ def main():
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError { err_type: ParseErrorType::MissingId, line, col, .. } => {
+            FileError { err_type: ParseError::MissingId, line, col, .. } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
             _ => panic!("Expected ParseError::MissingId, got {:?}", fragments),
         }
+    }
+
+    #[test]
+    fn test_weave_good() {
+        let text = "This is the first line!
+
+@@1
+
+Another line.";
+
+        let frag = Fragment {
+            id: String::from("1"),
+            body: String::from("{Example Code}"),
+            file: String::from("example.code"),
+            line: 1,
+            col: 0,
+        };
+
+        let mut annotations = HashMap::new();
+        annotations.insert(frag.id.to_owned(), frag.to_owned());
+        let result = weave(&text, annotations).expect("Expected weave to return Ok");
+        
+        assert_eq!(result,
+                   String::from("This is the first line!
+
+{Example Code}
+
+Another line."));
+    }
+
+    #[test]
+    fn test_weave_missing_fragment() {
+        let text = "This is the first line!
+
+@@1
+
+Another line.";
+
+        let annotations = HashMap::new();
+        let result = weave(&text, annotations).expect_err("Expected weave to return an error");
     }
 }
