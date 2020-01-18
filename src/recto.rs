@@ -60,12 +60,20 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
 
     for filename in cfg.filenames {
         println!("Expanding annotations in '{}'...", &filename);
+
         // TODO Improve error messages.
         let contents = fs::read_to_string(&filename)?;
+
         // Add annotations into the text body and emit to out directory
         let woven_body = weave(&contents, &annotations)?;
-        println!("Weave done...");
         let out_file = Path::new(&cfg.out_dir).join(&filename);
+
+        // Create subdirectories if needed.
+        match out_file.parent() {
+            Some(out_subdir) => fs::create_dir_all(&out_subdir)?,
+            None => (),
+        }
+
         println!("Writing result to {:?}...", out_file);
         fs::write(out_file, woven_body)?;
     }
