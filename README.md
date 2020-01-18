@@ -1,4 +1,4 @@
-# Verso / Recto - A Different Approach to Literate Programming
+# verso|recto - A Different Approach to Literate Programming
 
 > Literate programming is the art of preparing programs for human readers.
 
@@ -34,7 +34,7 @@ reader than mainstream approaches:
   rather than a literate style, introducing a barrier to entry to writing literate programs. Porting
   an existing project to a literate representation is nontrivial.
 
-`Verso / Recto` takes a different approach. It considers the source file as a first-class citizen to
+`verso|recto` takes a different approach. It considers the source file as a first-class citizen to
 be referenced by the documentation. Rather than embedding source code in documents, or documents in
 source code, lightweight annotations are used to mark sections of interest within the code which can
 be easily referenced by prose documents. There is no `tangle` step, and source files remain fully
@@ -43,7 +43,7 @@ formatting between literate sources and what the compiler sees.
 
 ## What traditional LP systems get right
 
-A lot of things! Here are a few ideas that the traditional systems pioneered and `Verso / Recto`
+A lot of things! Here are a few ideas that the traditional systems pioneered and `verso|recto`
 borrows:
 
 - Support a many-to-many relationship between LP documents and source files.
@@ -55,9 +55,9 @@ borrows:
   user's needs.
 - They generate indices and cross references within the human-readable output.
 
-## Using `Verso / Recto`
+## Using `verso|recto`
 
-`Verso / Recto` is driven by annotations within your source files, defining regions which can be
+`verso|recto` is driven by annotations within your source files, defining regions which can be
 referenced by other documents.
 
 ### Annotating a file
