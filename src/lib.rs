@@ -43,7 +43,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-pub fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragment>, ParseError> {
+pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>, ParseError> {
     let mut fragments: Vec<Fragment> = vec![];
 
     let mut fragment: Option<Fragment> = None;
@@ -68,7 +68,7 @@ pub fn extract_fragments(contents: String, filename: String) -> Result<Vec<Fragm
                             // The fragment to extract starts at the beginning of the next line.
                             line: line + 1,
                             col: 0,
-                            file: filename.clone(),
+                            file: filename.to_owned(),
                         });
                     } else {
                         return Err(ParseError {
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_extract_fragments() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(String::from(
+        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
             "# This is an example
 import sys
 
@@ -166,8 +166,7 @@ def main():
     do_stuff()
     make_awesome()
     # !@ This line ends the fragment.
-    sys.exit(1) # oops",
-        ));
+    sys.exit(1) # oops", "test.py");
 
         let fragments = fragments.expect("Expected no parse errors");
         assert!(
@@ -194,18 +193,17 @@ def main():
 
     #[test]
     fn test_extract_fragments_close_before_open() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(String::from(
+        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
             "# This is an example.
 
 # !@ This is an error on line 3.
 012345 The error is at column 2.
 # @! This begins the fragment.
-# !@ This line ends the fragment.",
-        ));
+# !@ This line ends the fragment.", "test.py");
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError::CloseBeforeOpen { line, col } => {
+            ParseError { err_type: ParseErrorType::CloseBeforeOpen, line, col, .. } => {
                 assert!(line == 3, "Expected error on line 3, found line {:?}", line);
                 assert!(col == 2, "Expected error on col 2, found col {:?}", col);
             }
@@ -215,17 +213,16 @@ def main():
 
     #[test]
     fn test_extract_fragments_double_open() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(String::from(
+        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
             "# This is an example.
 # @!foo-bar-baz This begins the fragment.
 # @! This is an error on line 3.
 012345 The error is at column 2.
-# !@ This line ends the fragment.",
-        ));
+# !@ This line ends the fragment.", "test.py");
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError::DoubleOpen { line, col } => {
+            ParseError { err_type: ParseErrorType::DoubleOpen, line, col, .. } => {
                 assert!(line == 3, "Expected error on line 3, found line {:?}", line);
                 assert!(col == 2, "Expected error on col 2, found col {:?}", col);
             }
@@ -233,19 +230,19 @@ def main():
         }
     }
 
+
     #[test]
     fn test_extract_fragments_missing_id() {
-        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(String::from(
+        let fragments: Result<Vec<Fragment>, ParseError> = extract_fragments(
             "# This is an example.
 
 # @! This is an error on line 3: No ID.
 012345 The error is at column 2.
-# !@ This line ends the fragment.",
-        ));
+# !@ This line ends the fragment.", "test.py");
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            ParseError::MissingId { line, col } => {
+            ParseError { err_type: ParseErrorType::MissingId, line, col, .. } => {
                 assert!(line == 3, "Expected error on line 3, found line {:?}", line);
                 assert!(col == 2, "Expected error on col 2, found col {:?}", col);
             }
