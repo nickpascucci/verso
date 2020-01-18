@@ -128,31 +128,31 @@ mod tests {
     #[test]
     fn test_extract_id_good() {
         let id = extract_id(&String::from("foobarbaz"), 0);
-        assert!(id.expect("Expected successful ID extraction") == String::from("foobarbaz"));
+        assert_eq!(id.expect("Expected successful ID extraction"), String::from("foobarbaz"));
     }
 
     #[test]
     fn test_extract_id_missing() {
         let id = extract_id(&String::from(""), 0);
-        assert!(id == None, "Expected None, got {:?}", id);
+        assert_eq!(id, None, "Expected None, got {:?}", id);
     }
 
     #[test]
     fn test_extract_id_nonalphanumeric() {
         let id = extract_id(&String::from("foo-bar-baz"), 0);
-        assert!(id.expect("Expected successful ID extraction") == String::from("foo-bar-baz"));
+        assert_eq!(id.expect("Expected successful ID extraction"), String::from("foo-bar-baz"));
     }
 
     #[test]
     fn test_extract_id_whitespace() {
         let id = extract_id(&String::from("foo-bar-baz quuz"), 0);
-        assert!(id.expect("Expected successful ID extraction") == String::from("foo-bar-baz"));
+        assert_eq!(id.expect("Expected successful ID extraction"), String::from("foo-bar-baz"));
     }
 
     #[test]
     fn test_extract_id_offset() {
         let id = extract_id(&String::from("foo-bar-baz quuz"), 4);
-        assert!(id.expect("Expected successful ID extraction") == String::from("bar-baz"));
+        assert_eq!(id.expect("Expected successful ID extraction"), String::from("bar-baz"));
     }
 
     #[test]
@@ -204,8 +204,8 @@ def main():
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
             ParseError { err_type: ParseErrorType::CloseBeforeOpen, line, col, .. } => {
-                assert!(line == 3, "Expected error on line 3, found line {:?}", line);
-                assert!(col == 2, "Expected error on col 2, found col {:?}", col);
+                assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
+                assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
             _ => panic!("Expected ParseError::CloseBeforeOpen, got {:?}", fragments),
         }
@@ -223,8 +223,8 @@ def main():
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
             ParseError { err_type: ParseErrorType::DoubleOpen, line, col, .. } => {
-                assert!(line == 3, "Expected error on line 3, found line {:?}", line);
-                assert!(col == 2, "Expected error on col 2, found col {:?}", col);
+                assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
+                assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
             _ => panic!("Expected ParseError::DoubleOpen, got {:?}", fragments),
         }
@@ -243,8 +243,8 @@ def main():
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
             ParseError { err_type: ParseErrorType::MissingId, line, col, .. } => {
-                assert!(line == 3, "Expected error on line 3, found line {:?}", line);
-                assert!(col == 2, "Expected error on col 2, found col {:?}", col);
+                assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
+                assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
             _ => panic!("Expected ParseError::MissingId, got {:?}", fragments),
         }
