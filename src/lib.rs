@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use std::error::Error;
 use std::fmt;
@@ -51,7 +51,10 @@ impl<T: fmt::Debug> fmt::Display for FileError<T> {
     }
 }
 
-pub fn extract_fragments(contents: &str, filename: &str) -> Result<Vec<Fragment>, FileError<ParseError>> {
+pub fn extract_fragments(
+    contents: &str,
+    filename: &str,
+) -> Result<Vec<Fragment>, FileError<ParseError>> {
     let mut fragments: Vec<Fragment> = vec![];
 
     let mut fragment: Option<Fragment> = None;
@@ -129,7 +132,10 @@ fn extract_id(content: &str, col: usize) -> Option<String> {
     }
 }
 
-fn weave(contents: &str, annotations: HashMap<String, Fragment>) -> Result<String, FileError<WeaveError>> {
+pub fn weave(
+    contents: &str,
+    annotations: &HashMap<String, Fragment>,
+) -> Result<String, FileError<WeaveError>> {
     let mut substrings: Vec<String> = vec![];
 
     for (line_no, line) in contents.lines().enumerate() {
@@ -141,19 +147,22 @@ fn weave(contents: &str, annotations: HashMap<String, Fragment>) -> Result<Strin
                     match fragment {
                         // TODO Add indexing information.
                         Some(f) => substrings.push(f.body.to_owned()),
-                        None => return Err(FileError{
-                            err_type: WeaveError::MissingFragment(id.to_owned()),
-                            line: line_no,
-                            col: INSERTION_SYMBOL.len(),
-                        }),
+                        None => {
+                            return Err(FileError {
+                                err_type: WeaveError::MissingFragment(id.to_owned()),
+                                line: line_no,
+                                col: INSERTION_SYMBOL.len(),
+                            })
+                        }
                     }
-                    
-                },
-                None => return Err(FileError {
-                    err_type: WeaveError::MissingId,
-                    line: line_no,
-                    col: 0,
-                }),
+                }
+                None => {
+                    return Err(FileError {
+                        err_type: WeaveError::MissingId,
+                        line: line_no,
+                        col: 0,
+                    })
+                }
             }
         } else {
             substrings.push(line.to_owned());
@@ -170,7 +179,10 @@ mod tests {
     #[test]
     fn test_extract_id_good() {
         let id = extract_id(&String::from("foobarbaz"), 0);
-        assert_eq!(id.expect("Expected successful ID extraction"), String::from("foobarbaz"));
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("foobarbaz")
+        );
     }
 
     #[test]
@@ -182,19 +194,28 @@ mod tests {
     #[test]
     fn test_extract_id_nonalphanumeric() {
         let id = extract_id(&String::from("foo-bar-baz"), 0);
-        assert_eq!(id.expect("Expected successful ID extraction"), String::from("foo-bar-baz"));
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("foo-bar-baz")
+        );
     }
 
     #[test]
     fn test_extract_id_whitespace() {
         let id = extract_id(&String::from("foo-bar-baz quuz"), 0);
-        assert_eq!(id.expect("Expected successful ID extraction"), String::from("foo-bar-baz"));
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("foo-bar-baz")
+        );
     }
 
     #[test]
     fn test_extract_id_offset() {
         let id = extract_id(&String::from("foo-bar-baz quuz"), 4);
-        assert_eq!(id.expect("Expected successful ID extraction"), String::from("bar-baz"));
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("bar-baz")
+        );
     }
 
     #[test]
@@ -208,7 +229,9 @@ def main():
     do_stuff()
     make_awesome()
     # !@ This line ends the fragment.
-    sys.exit(1) # oops", "test.py");
+    sys.exit(1) # oops",
+            "test.py",
+        );
 
         let fragments = fragments.expect("Expected no parse errors");
         assert!(
@@ -241,11 +264,18 @@ def main():
 # !@ This is an error on line 3.
 012345 The error is at column 2.
 # @! This begins the fragment.
-# !@ This line ends the fragment.", "test.py");
+# !@ This line ends the fragment.",
+            "test.py",
+        );
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            FileError { err_type: ParseError::CloseBeforeOpen, line, col, .. } => {
+            FileError {
+                err_type: ParseError::CloseBeforeOpen,
+                line,
+                col,
+                ..
+            } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
@@ -260,18 +290,24 @@ def main():
 # @!foo-bar-baz This begins the fragment.
 # @! This is an error on line 3.
 012345 The error is at column 2.
-# !@ This line ends the fragment.", "test.py");
+# !@ This line ends the fragment.",
+            "test.py",
+        );
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            FileError { err_type: ParseError::DoubleOpen, line, col, .. } => {
+            FileError {
+                err_type: ParseError::DoubleOpen,
+                line,
+                col,
+                ..
+            } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
             _ => panic!("Expected ParseError::DoubleOpen, got {:?}", fragments),
         }
     }
-
 
     #[test]
     fn test_extract_fragments_missing_id() {
@@ -280,11 +316,18 @@ def main():
 
 # @! This is an error on line 3: No ID.
 012345 The error is at column 2.
-# !@ This line ends the fragment.", "test.py");
+# !@ This line ends the fragment.",
+            "test.py",
+        );
 
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
-            FileError { err_type: ParseError::MissingId, line, col, .. } => {
+            FileError {
+                err_type: ParseError::MissingId,
+                line,
+                col,
+                ..
+            } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
@@ -310,14 +353,18 @@ Another line.";
 
         let mut annotations = HashMap::new();
         annotations.insert(frag.id.to_owned(), frag.to_owned());
-        let result = weave(&text, annotations).expect("Expected weave to return Ok");
-        
-        assert_eq!(result,
-                   String::from("This is the first line!
+        let result = weave(&text, &annotations).expect("Expected weave to return Ok");
+
+        assert_eq!(
+            result,
+            String::from(
+                "This is the first line!
 
 {Example Code}
 
-Another line."));
+Another line."
+            )
+        );
     }
 
     #[test]
@@ -329,6 +376,6 @@ Another line."));
 Another line.";
 
         let annotations = HashMap::new();
-        let result = weave(&text, annotations).expect_err("Expected weave to return an error");
+        weave(&text, &annotations).expect_err("Expected weave to return an error");
     }
 }

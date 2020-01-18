@@ -40,7 +40,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
 
     // Do the read and print in separate passes to enable clean error messages.
     for filename in cfg.filenames {
-        let contents = fs::read_to_string(filename.clone())?;
+        let contents = fs::read_to_string(&filename)?;
         let mut fragments = extract_fragments(&contents, &filename)?;
         annotations.append(&mut fragments);
     }

@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use verso::{Fragment};
+use verso::{weave, Fragment};
 
-use std::io;
-use std::fs;
 use std::env;
 use std::error::Error;
+use std::fs;
+use std::io;
+use std::path::Path;
 use std::process;
 
 fn main() {
@@ -34,7 +35,7 @@ impl Config {
             return Err("Expected at least two arguments");
         }
 
-        let out_dir = args[1].to_owned();
+        let out_dir = String::from(&args[1]);
         let filenames = args[2..].iter().cloned().collect();
 
         Ok(Config { out_dir, filenames })
@@ -42,10 +43,10 @@ impl Config {
 }
 
 pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
-
     // Read annotations from stdin, and index by ID.
     let mut annotations = HashMap::new();
-    { // Read the annotations into the map in a block to reduce pressure.
+    {
+        // Read the annotations into the map in a block to reduce memory pressure.
         let raw_annotations: Vec<Fragment> = serde_json::from_reader(io::stdin())?;
 
         for ann in raw_annotations {
@@ -54,12 +55,20 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    for filename in cfg.filenames {
-        // TODO Improve error messages.
-        let contents = fs::read_to_string(filename.clone())?;
-        // Add annotations into the text body and emit to out directory
-    }
+    println!("Creating results in directory '{}'...", &cfg.out_dir);
+    fs::create_dir_all(&cfg.out_dir)?;
 
+    for filename in cfg.filenames {
+        println!("Expanding annotations in '{}'...", &filename);
+        // TODO Improve error messages.
+        let contents = fs::read_to_string(&filename)?;
+        // Add annotations into the text body and emit to out directory
+        let woven_body = weave(&contents, &annotations)?;
+        println!("Weave done...");
+        let out_file = Path::new(&cfg.out_dir).join(&filename);
+        println!("Writing result to {:?}...", out_file);
+        fs::write(out_file, woven_body)?;
+    }
 
     Ok(())
 }
