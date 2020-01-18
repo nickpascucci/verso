@@ -70,20 +70,28 @@ source file you're annotating.
 ### Referencing annotations
 
 In order to reference an annotation in another file, add a line containing the symbol `@@` followed
-by the ID of the annotation. When the file is woven using the `recto` command (see the next
-section), the line will be replaced with the contents of the annotation. You can add any markup you
-like around the line to provide formatting.
+by the ID of the annotation (e.g. `@@12345`). When the file is woven using the `recto` command (see
+the next section), the line will be replaced with the contents of the annotation. You can add any
+markup you like around the line to provide formatting.
 
 ### Weaving a document for human consumption
 
 The `verso` command will read all of the annotations from the files specified on the command line,
-extract their annotations, and output the result to stdout. In turn the `recto` command, if the
-`--annotations-from` option is not used, will read its annotations from stdin. This makes the two
-programs easy to use together via pipes:
+extract their annotations, and output the result to stdout. In turn the `recto` command will read
+its annotations from stdin. This makes the two programs easy to use together via pipes:
 
-`verso main.rs lib.rs | recto --dir build chap1.tex chap2.tex home.md`
+```
+verso main.rs lib.rs | recto build chap1.tex chap2.tex blog/home.md
+      ^       ^              ^     ^         ^         ^
+      +-------+              |     +---------+---------+
+      |                      |                         |
+      |                      |                         |
+      +--- Source files      +--- Output directory     +--- Prose files
+```
 
-_(Conveniently, the `verso` program goes on the left of the pipe while `recto` goes on the right.)_
+Each of the woven files is written to the output directory, provided as the first argument, in the
+same relative location as given on the command line. So, for example, the file `blog/home.md` above
+will be written to `build/blog/home.md` when it is woven.
 
 ## The Name
 
@@ -93,8 +101,12 @@ _(Conveniently, the `verso` program goes on the left of the pipe while `recto` g
 
 _[Wikipedia - Recto and Verso](https://en.wikipedia.org/wiki/Recto_and_verso)_
 
+_(Note that, conveniently, the `verso` program goes on the left of the pipe while `recto` goes on
+the right.)_
+
 ## Future Work
 
 - Add support for allow overlapping annotations.
 - Add support for custom formatting of annotation properties within the woven output.
 - Paralellize file processing in Verso, and both reading from `stdin` and file reading in Recto.
+- Add `--annotations-from` option to specify a source other than stdin for annotations.
