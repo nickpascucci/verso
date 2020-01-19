@@ -51,15 +51,15 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
 
         for ann in raw_annotations {
             annotations.insert(ann.id.to_owned(), ann.to_owned());
-            println!("Read annotation {}", ann.id);
+            eprintln!("Read annotation {}", ann.id);
         }
     }
 
-    println!("Creating results in directory '{}'...", &cfg.out_dir);
+    eprintln!("Creating results in directory '{}'...", &cfg.out_dir);
     fs::create_dir_all(&cfg.out_dir)?;
 
     for filename in cfg.filenames {
-        println!("Expanding annotations in '{}'...", &filename);
+        eprintln!("Expanding annotations in '{}'...", &filename);
 
         // TODO Improve error messages.
         let contents = fs::read_to_string(&filename)?;
@@ -74,7 +74,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
             None => (),
         }
 
-        println!("Writing result to {:?}...", out_file);
+        eprintln!("Writing result to {:?}...", out_file);
         fs::write(out_file, woven_body)?;
     }
 
