@@ -1,5 +1,7 @@
 # verso|recto - A Different Approach to Literate Programming
 
+[![CI Status](https://github.com/nickpascucci/verso/workflows/Rust/badge.svg)](https://github.com/nickpascucci/verso/actions)
+
 > Literate programming is the art of preparing programs for human readers.
 
 _Norman Ramsey, on the [noweb homepage](https://www.cs.tufts.edu/~nr/noweb/)._
@@ -103,6 +105,11 @@ _[Wikipedia - Recto and Verso](https://en.wikipedia.org/wiki/Recto_and_verso)_
 
 _(Note that, conveniently, the `verso` program goes on the left of the pipe while `recto` goes on
 the right.)_
+
+## Contributors
+
+- [@nickpascucci](https://github.com/nickpascucci/)
+- [@karlicoss](https://github.com/karlicoss/)
 
 ## Future Work
 
