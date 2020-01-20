@@ -35,6 +35,7 @@ pub enum WeaveError {
 #[derive(Debug, PartialEq, Clone)]
 pub struct FileError<T: fmt::Debug> {
     err_type: T,
+    filename: String,
     line: usize,
     col: usize,
 }
@@ -45,8 +46,8 @@ impl<T: fmt::Debug> fmt::Display for FileError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{:?}: line {}, column {}",
-            self.err_type, self.line, self.col
+            "{:?} in {}: line {}, column {}",
+            self.err_type, self.filename, self.line, self.col
         )
     }
 }
@@ -65,6 +66,7 @@ pub fn extract_fragments(
                 if let Some(col) = content.find(BLOCK_CLOSE_SYMBOL) {
                     return Err(FileError {
                         err_type: ParseError::CloseBeforeOpen,
+                        filename: filename.to_owned(),
                         line,
                         col,
                     });
@@ -84,6 +86,7 @@ pub fn extract_fragments(
                     } else {
                         return Err(FileError {
                             err_type: ParseError::MissingId,
+                            filename: filename.to_owned(),
                             line,
                             col,
                         });
@@ -101,6 +104,7 @@ pub fn extract_fragments(
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
                     return Err(FileError {
                         err_type: ParseError::DoubleOpen,
+                        filename: filename.to_owned(),
                         line,
                         col,
                     });
@@ -133,6 +137,7 @@ fn extract_id(content: &str, col: usize) -> Option<String> {
 }
 
 pub fn weave(
+    filename: &str,
     contents: &str,
     annotations: &HashMap<String, Fragment>,
 ) -> Result<String, FileError<WeaveError>> {
@@ -150,6 +155,7 @@ pub fn weave(
                         None => {
                             return Err(FileError {
                                 err_type: WeaveError::MissingFragment(id.to_owned()),
+                                filename: filename.to_owned(),
                                 line: line_no,
                                 col: INSERTION_SYMBOL.len(),
                             })
@@ -159,6 +165,7 @@ pub fn weave(
                 None => {
                     return Err(FileError {
                         err_type: WeaveError::MissingId,
+                        filename: filename.to_owned(),
                         line: line_no,
                         col: 0,
                     })
@@ -353,7 +360,7 @@ Another line.";
 
         let mut annotations = HashMap::new();
         annotations.insert(frag.id.to_owned(), frag.to_owned());
-        let result = weave(&text, &annotations).expect("Expected weave to return Ok");
+        let result = weave("test", &text, &annotations).expect("Expected weave to return Ok");
 
         assert_eq!(
             result,
@@ -376,6 +383,6 @@ Another line."
 Another line.";
 
         let annotations = HashMap::new();
-        weave(&text, &annotations).expect_err("Expected weave to return an error");
+        weave("test", &text, &annotations).expect_err("Expected weave to return an error");
     }
 }
