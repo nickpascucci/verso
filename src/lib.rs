@@ -4,8 +4,11 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-const BLOCK_OPEN_SYMBOL: &'static str = "@" + "<";
-const BLOCK_CLOSE_SYMBOL: &'static str = ">" + "@";
+macro_rules! trigger {
+    ($l:literal, $j:literal) => ("$i$j")
+}
+const BLOCK_OPEN_SYMBOL: &'static str = trigger!("@", "<");
+const BLOCK_CLOSE_SYMBOL: &'static str = trigger!(">", "@");
 const INSERTION_SYMBOL: &'static str = "@@";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
