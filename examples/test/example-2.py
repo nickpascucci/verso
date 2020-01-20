@@ -2,6 +2,6 @@ import sys
 
 FOO = "BAR"
 
-# @!2
+# @<2
 assert(1 == 2)
-# !@2
+# >@2

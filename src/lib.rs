@@ -4,10 +4,10 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-// Blocks are opened by using the form @!<id>. For example: @!202001171309.
-// The ID can be any set of characters terminated by whitespace.
-const BLOCK_OPEN_SYMBOL: &'static str = "@!";
-const BLOCK_CLOSE_SYMBOL: &'static str = "!@";
+// Blocks are opened by using the form @<id. For example: @!202001171309.
+// The ID can be any set of alphanumeric characters.
+const BLOCK_OPEN_SYMBOL: &'static str = "@<";
+const BLOCK_CLOSE_SYMBOL: &'static str = ">@";
 const INSERTION_SYMBOL: &'static str = "@@";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -124,7 +124,7 @@ pub fn extract_fragments(
 
 fn extract_id(content: &str, col: usize) -> Option<String> {
     let it = content.chars().skip(col);
-    let id: String = it.take_while(|c| !c.is_whitespace()).collect();
+    let id: String = it.take_while(|c| c.is_alphanumeric()).collect();
     if id.is_empty() {
         None
     } else {
@@ -196,16 +196,16 @@ mod tests {
         let id = extract_id(&String::from("foo-bar-baz"), 0);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
-            String::from("foo-bar-baz")
+            String::from("foo")
         );
     }
 
     #[test]
     fn test_extract_id_whitespace() {
-        let id = extract_id(&String::from("foo-bar-baz quuz"), 0);
+        let id = extract_id(&String::from("foo bar baz quuz"), 0);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
-            String::from("foo-bar-baz")
+            String::from("foo")
         );
     }
 
@@ -214,7 +214,7 @@ mod tests {
         let id = extract_id(&String::from("foo-bar-baz quuz"), 4);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
-            String::from("bar-baz")
+            String::from("bar")
         );
     }
 
@@ -224,11 +224,11 @@ mod tests {
             "# This is an example
 import sys
 
-# @!foo-bar-baz The fragment starts and its ID is defined on this line; it is foo-bar-baz.
+# @<foobarbaz The fragment starts and its ID is defined on this line; it is foobarbaz.
 def main():
     do_stuff()
     make_awesome()
-    # !@ This line ends the fragment.
+    # >@ This line ends the fragment.
     sys.exit(1) # oops",
             "test.py",
         );
@@ -250,7 +250,7 @@ def main():
             fragments[0].body
         );
         assert!(
-            fragments[0].id == String::from("foo-bar-baz"),
+            fragments[0].id == String::from("foobarbaz"),
             "Unexpected ID {:?}",
             fragments[0].id
         );
@@ -261,10 +261,10 @@ def main():
         let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
 
-# !@ This is an error on line 3.
+# >@ This is an error on line 3.
 012345 The error is at column 2.
-# @! This begins the fragment.
-# !@ This line ends the fragment.",
+# @< This begins the fragment.
+# >@ This line ends the fragment.",
             "test.py",
         );
 
@@ -287,10 +287,10 @@ def main():
     fn test_extract_fragments_double_open() {
         let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
-# @!foo-bar-baz This begins the fragment.
-# @! This is an error on line 3.
+# @<foobarbaz This begins the fragment.
+# @< This is an error on line 3.
 012345 The error is at column 2.
-# !@ This line ends the fragment.",
+# >@ This line ends the fragment.",
             "test.py",
         );
 
@@ -314,9 +314,9 @@ def main():
         let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
 
-# @! This is an error on line 3: No ID.
+# @< This is an error on line 3: No ID.
 012345 The error is at column 2.
-# !@ This line ends the fragment.",
+# >@ This line ends the fragment.",
             "test.py",
         );
 
