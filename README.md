@@ -95,6 +95,11 @@ Each of the woven files is written to the output directory, provided as the firs
 same relative location as given on the command line. So, for example, the file `blog/home.md` above
 will be written to `build/blog/home.md` when it is woven.
 
+Note that, although the two programs run in parallel, `verso` won't send input to `recto` until it
+has successfully extracted annotations from all of the source files it was given and that `recto`
+will not start weaving files together until it receives those annotations. Because of this if
+`verso` fails, `recto` will also fail.
+
 ## The Name
 
 > Recto and verso are respectively, the text written or printed on the "right" or "front" side and
