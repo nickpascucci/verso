@@ -139,7 +139,7 @@ pub fn weave(
     let mut substrings: Vec<String> = vec![];
 
     for (line_no, line) in contents.lines().enumerate() {
-        if line.starts_with(INSERTION_SYMBOL) {
+        if line.trim().starts_with(INSERTION_SYMBOL) {
             let id = extract_id(line, INSERTION_SYMBOL.len());
             match id {
                 Some(id) => {
