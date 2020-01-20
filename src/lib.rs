@@ -4,10 +4,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-// Blocks are opened by using the form @<id. For example: @!202001171309.
-// The ID can be any set of alphanumeric characters.
-const BLOCK_OPEN_SYMBOL: &'static str = "@<";
-const BLOCK_CLOSE_SYMBOL: &'static str = ">@";
+const BLOCK_OPEN_SYMBOL: &'static str = "@" + "<";
+const BLOCK_CLOSE_SYMBOL: &'static str = ">" + "@";
 const INSERTION_SYMBOL: &'static str = "@@";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
