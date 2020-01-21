@@ -1,10 +1,16 @@
-<!-- The next comment contains a verso fragment identifier. There is a matching comment at the end
-of the file. Everything between the two comments will be extracted by verso and woven into the
-presentation by recto. -->
-
- <!-- @<1 -->
-
 # Rust, by example
+
+_Illustrated along the way by `verso|recto`_
+
+-----
+
+I'm going to use my side project, `verso|recto`, to illustrate some basic Rust
+ideas.
+
+`verso|recto` is a literate programming tool that lets you include source code
+in prose documents. 
+
+Documents like this slide show.
 
 -----
 
@@ -12,7 +18,7 @@ presentation by recto. -->
 
 This is the script that builds this presentation:
 
-```
+```bash
 set -ex
 
 if [ -d build ]; then
@@ -29,8 +35,9 @@ verso ../src/lib.rs \
 
 -----
 
-## Slide 2
+You can find the source for `verso|recto` at:
 
-Here's another slide.
+https://github.com/nickpascucci/verso
 
-<!-- >@1 -->
+Don't worry; we'll have lots of code examples right here in the presentation, so
+no need to follow along.
