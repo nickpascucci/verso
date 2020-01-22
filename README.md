@@ -65,7 +65,7 @@ referenced by other documents.
 ### Annotating a file
 
 Annotations are quite simple. To mark a region of code for reference, simply add a pair of comments
-around the region with the symbols `@!` and `!@`, followed by a unique ID. The ID can be any string
+around the region with the symbols `@<` and `>@`, followed by a unique ID. The ID can be any string
 of non-whitespace characters, though it should be both unique within your project and valid in the
 source file you're annotating.
 
