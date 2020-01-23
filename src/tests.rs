@@ -3,48 +3,6 @@ mod tests {
     use verso::*;
 
     #[test]
-    fn test_extract_id_good() {
-        let id = extract_id(&String::from("foobarbaz"), 0);
-        assert_eq!(
-            id.expect("Expected successful ID extraction"),
-            String::from("foobarbaz")
-        );
-    }
-
-    #[test]
-    fn test_extract_id_missing() {
-        let id = extract_id(&String::from(""), 0);
-        assert_eq!(id, None, "Expected None, got {:?}", id);
-    }
-
-    #[test]
-    fn test_extract_id_nonalphanumeric() {
-        let id = extract_id(&String::from("foo-bar-baz"), 0);
-        assert_eq!(
-            id.expect("Expected successful ID extraction"),
-            String::from("foo")
-        );
-    }
-
-    #[test]
-    fn test_extract_id_whitespace() {
-        let id = extract_id(&String::from("foo bar baz quuz"), 0);
-        assert_eq!(
-            id.expect("Expected successful ID extraction"),
-            String::from("foo")
-        );
-    }
-
-    #[test]
-    fn test_extract_id_offset() {
-        let id = extract_id(&String::from("foo-bar-baz quuz"), 4);
-        assert_eq!(
-            id.expect("Expected successful ID extraction"),
-            String::from("bar")
-        );
-    }
-
-    #[test]
     fn test_extract_fragments() {
         let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example

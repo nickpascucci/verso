@@ -10,7 +10,10 @@ fi
     
 verso ../src/lib.rs \
       ../src/verso.rs \
-      ../src/recto.rs build.sh  \
+      ../src/recto.rs \
+      examples/*.rs \
+      examples/*.c \
+      build.sh  \
     | recto build presentation.md
 # >@buildsh
 

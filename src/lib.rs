@@ -24,6 +24,7 @@ pub enum ParseError {
     MissingId,
 }
 
+// @<errors
 #[derive(Debug, PartialEq, Clone)]
 pub enum WeaveError {
     MissingFragment(String),
@@ -37,6 +38,7 @@ pub struct FileError<T: fmt::Debug> {
     line: usize,
     col: usize,
 }
+// >@errors
 
 impl<T: fmt::Debug> Error for FileError<T> {}
 
@@ -96,6 +98,7 @@ pub fn extract_fragments(
                 // If the line contains an end marker, end the fragment if one exists.
                 if let Some(_) = content.find(BLOCK_CLOSE_SYMBOL) {
                     fragments.push(f.to_owned());
+                    fragment = None;
                     continue;
                 }
 
@@ -124,6 +127,7 @@ pub fn extract_fragments(
     Ok(fragments)
 }
 
+// @<extractid
 fn extract_id(content: &str, col: usize) -> Option<String> {
     let it = content.chars().skip(col);
     let id: String = it.take_while(|c| c.is_alphanumeric()).collect();
@@ -133,6 +137,7 @@ fn extract_id(content: &str, col: usize) -> Option<String> {
         Some(id)
     }
 }
+// >@extractid
 
 pub fn weave(
     filename: &str,
@@ -175,4 +180,55 @@ pub fn weave(
     }
 
     return Ok(substrings.join("\n"));
+}
+
+// @<tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_id_missing() {
+        let id = extract_id(&String::from(""), 0);
+        assert_eq!(id, None, "Expected None, got {:?}", id);
+    }
+    // ... snip ...
+    // >@tests
+
+
+    #[test]
+    fn test_extract_id_good() {
+        let id = extract_id(&String::from("foobarbaz"), 0);
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("foobarbaz")
+        );
+    }
+
+    #[test]
+    fn test_extract_id_nonalphanumeric() {
+        let id = extract_id(&String::from("foo-bar-baz"), 0);
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("foo")
+        );
+    }
+
+    #[test]
+    fn test_extract_id_whitespace() {
+        let id = extract_id(&String::from("foo bar baz quuz"), 0);
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("foo")
+        );
+    }
+
+    #[test]
+    fn test_extract_id_offset() {
+        let id = extract_id(&String::from("foo-bar-baz quuz"), 4);
+        assert_eq!(
+            id.expect("Expected successful ID extraction"),
+            String::from("bar")
+        );
+    }
 }
