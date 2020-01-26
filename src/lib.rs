@@ -37,8 +37,9 @@ pub enum ParseError {
 pub enum WeaveError {
     MissingFragment(String),
     MissingId,
-    BadReference(String),
     ReferenceParseError,
+    BadReference(String),
+    UnknownProperty(String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -324,7 +325,7 @@ fn expand_reference(
                 COL_NO_REF => Ok(f.col.to_string()),
                 LOC_REF => Ok(format!("{} ({}:{})", f.file, f.line, f.col)),
                 _ => Err(FileError {
-                    err_type: WeaveError::BadReference(prop.to_owned()),
+                    err_type: WeaveError::UnknownProperty(prop.to_owned()),
                     filename: filename.to_owned(),
                     line,
                     col: col + frag_id.len() + 1,
@@ -610,7 +611,7 @@ Another line.";
         let err = weave("test", &text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
-                err_type: WeaveError::BadReference(s),
+                err_type: WeaveError::UnknownProperty(s),
                 line,
                 col,
                 ..
@@ -619,7 +620,7 @@ Another line.";
                 assert_eq!(col, 4, "Expected error on col 4, found col {:?}", col);
                 assert_eq!(s, "foo", "Expected error message to be \"foo\", got {:?}", s);
             }
-            _ => panic!("Expected WeaveError::BadReference, got {:?}", err),
+            _ => panic!("Expected WeaveError::UnknownProperty, got {:?}", err),
         }
     }
 
@@ -627,7 +628,7 @@ Another line.";
     fn test_weave_bad_reference_id() {
         let text = "This is the first line!
 
-@?1.foo
+@?1.loc
 
 Another line.";
 
