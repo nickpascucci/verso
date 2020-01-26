@@ -169,7 +169,7 @@ pub fn weave(
 ) -> Result<String, FileError<WeaveError>> {
     let mut substrings: Vec<String> = vec![];
 
-    for (line_no, line) in contents.lines().enumerate() {
+    for (line_no, line) in contents.lines().enumerate().map(|(l, c)| (l + 1, c)) {
         if line.trim_start().starts_with(INSERTION_SYMBOL) {
             let id = extract_id(line, INSERTION_SYMBOL.len());
             match id {
@@ -585,5 +585,66 @@ Another line.";
 
         let annotations = HashMap::new();
         weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+    }
+
+    #[test]
+    fn test_weave_bad_reference_type() {
+        let text = "This is the first line!
+
+@?1.foo
+
+Another line.";
+
+        let frag = Fragment {
+            id: String::from("1"),
+            body: String::from("{Example Code}"),
+            file: String::from("example.code"),
+            line: 1,
+            col: 0,
+        };
+
+        let mut annotations = HashMap::new();
+        annotations.insert(frag.id.to_owned(), frag.to_owned());
+
+        let err = weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+        match err {
+            FileError {
+                err_type: WeaveError::BadReference(s),
+                line,
+                col,
+                ..
+            } => {
+                assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
+                assert_eq!(col, 0, "Expected error on col 0, found col {:?}", col);
+                assert_eq!(s, "foo", "Expected error message to be \"foo\", got {:?}", s);
+            }
+            _ => panic!("Expected WeaveError::BadReference, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_weave_bad_reference_id() {
+        let text = "This is the first line!
+
+@?1.foo
+
+Another line.";
+
+        let annotations = HashMap::new();
+
+        let err = weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+        match err {
+            FileError {
+                err_type: WeaveError::MissingFragment(s),
+                line,
+                col,
+                ..
+            } => {
+                assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
+                assert_eq!(col, 0, "Expected error on col 0, found col {:?}", col);
+                assert_eq!(s, "1", "Expected error message to be \"1\", got {:?}", s);
+            }
+            _ => panic!("Expected WeaveError::MissingFragment, got {:?}", err),
+        }
     }
 }
