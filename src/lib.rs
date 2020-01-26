@@ -311,6 +311,7 @@ fn expand_reference(
     annotations: &HashMap<String, Fragment>,
 ) -> Result<String, FileError<WeaveError>> {
     let word = word.trim_start_matches(REFERENCE_SYMBOL);
+    let col = col + REFERENCE_SYMBOL.len(); // Offset column to account for the symbol we removed.
     let pieces: Vec<&str> = word.split('.').collect();
     if pieces.len() == 2 {
         let frag_id = pieces[0];
@@ -326,7 +327,7 @@ fn expand_reference(
                     err_type: WeaveError::BadReference(prop.to_owned()),
                     filename: filename.to_owned(),
                     line,
-                    col,
+                    col: col + frag_id.len() + 1,
                 }),
             },
             None => Err(FileError {
@@ -615,7 +616,7 @@ Another line.";
                 ..
             } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
-                assert_eq!(col, 0, "Expected error on col 0, found col {:?}", col);
+                assert_eq!(col, 4, "Expected error on col 4, found col {:?}", col);
                 assert_eq!(s, "foo", "Expected error message to be \"foo\", got {:?}", s);
             }
             _ => panic!("Expected WeaveError::BadReference, got {:?}", err),
@@ -641,7 +642,7 @@ Another line.";
                 ..
             } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
-                assert_eq!(col, 0, "Expected error on col 0, found col {:?}", col);
+                assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
                 assert_eq!(s, "1", "Expected error message to be \"1\", got {:?}", s);
             }
             _ => panic!("Expected WeaveError::MissingFragment, got {:?}", err),
