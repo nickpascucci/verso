@@ -7,7 +7,13 @@ use std::fmt;
 const BLOCK_OPEN_SYMBOL: &'static str = concat!("@", "<");
 const BLOCK_CLOSE_SYMBOL: &'static str = concat!(">", "@");
 const INSERTION_SYMBOL: &'static str = "@@";
+const REFERENCE_SYMBOL: &'static str = "@?";
 const HALT_SYMBOL: &'static str = "@!halt";
+
+const FILENAME_REF: &'static str = "file";
+const LINE_NO_REF: &'static str = "line";
+const COL_NO_REF: &'static str = "col";
+const LOC_REF: &'static str = "loc";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Fragment {
@@ -31,6 +37,8 @@ pub enum ParseError {
 pub enum WeaveError {
     MissingFragment(String),
     MissingId,
+    BadReference(String),
+    ReferenceParseError,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -162,7 +170,7 @@ pub fn weave(
     let mut substrings: Vec<String> = vec![];
 
     for (line_no, line) in contents.lines().enumerate() {
-        if line.trim().starts_with(INSERTION_SYMBOL) {
+        if line.trim_start().starts_with(INSERTION_SYMBOL) {
             let id = extract_id(line, INSERTION_SYMBOL.len());
             match id {
                 Some(id) => {
@@ -189,12 +197,154 @@ pub fn weave(
                     })
                 }
             }
+        } else if line.contains(REFERENCE_SYMBOL) {
+            let expanded = expand_references(&line, &filename, line_no, &annotations)?;
+            substrings.push(expanded);
         } else {
             substrings.push(line.to_owned());
         }
     }
 
     return Ok(substrings.join("\n"));
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum ScannerState {
+    SearchingForRefStart,
+    ReadingRefStart,
+    ReadingId,
+    ReadingRefType,
+}
+
+fn expand_references(
+    line: &str,
+    filename: &str,
+    line_no: usize,
+    annotations: &HashMap<String, Fragment>,
+) -> Result<String, FileError<WeaveError>> {
+    let mut pieces: Vec<String> = vec![];
+
+    let mut state = ScannerState::SearchingForRefStart;
+    let mut start_col: usize = 0;
+
+    for (col, c) in line.chars().enumerate() {
+        match &state {
+            ScannerState::SearchingForRefStart => {
+                if line[col..].starts_with(REFERENCE_SYMBOL) {
+                    if col > start_col {
+                        pieces.push(line[start_col..col].to_owned());
+                    }
+                    start_col = col;
+                    state = ScannerState::ReadingRefStart;
+                }
+            }
+            ScannerState::ReadingRefStart => {
+                let chars_read = col - start_col;
+                if chars_read >= REFERENCE_SYMBOL.len() {
+                    state = ScannerState::ReadingId;
+                } else if c != REFERENCE_SYMBOL.chars().nth(chars_read).expect("") {
+                    return Err(FileError {
+                        err_type: WeaveError::ReferenceParseError,
+                        filename: filename.to_owned(),
+                        line: line_no,
+                        col,
+                    });
+                }
+            }
+            ScannerState::ReadingId => {
+                if !c.is_alphanumeric() {
+                    if c == '.' {
+                        state = ScannerState::ReadingRefType;
+                    } else {
+                        return Err(FileError {
+                            err_type: WeaveError::ReferenceParseError,
+                            filename: filename.to_owned(),
+                            line: line_no,
+                            col,
+                        });
+                    };
+                }
+            }
+            ScannerState::ReadingRefType => {
+                // TODO Clean up this code a little, to reduce duplication.
+                if !c.is_alphanumeric() {
+                    state = ScannerState::SearchingForRefStart;
+                    let expansion = expand_reference(
+                        &line[start_col..col],
+                        &filename,
+                        line_no,
+                        start_col,
+                        annotations,
+                    )?;
+                    pieces.push(expansion);
+                    start_col = col;
+                } else if col == line.len() - 1 {
+                    state = ScannerState::SearchingForRefStart;
+                    let col = col + 1; // NOTE This differs from the block above.
+                    let expansion = expand_reference(
+                        &line[start_col..col],
+                        &filename,
+                        line_no,
+                        start_col,
+                        annotations,
+                    )?;
+                    pieces.push(expansion);
+                    start_col = col;
+                };
+            }
+        }
+    }
+
+    // Pick up any remaining unparsed data.
+    if state != ScannerState::ReadingRefType {
+        pieces.push(line[start_col..].to_owned());
+    }
+
+    Ok(pieces.join(""))
+}
+
+fn expand_reference(
+    word: &str,
+    filename: &str,
+    line: usize,
+    col: usize,
+    annotations: &HashMap<String, Fragment>,
+) -> Result<String, FileError<WeaveError>> {
+    let word = word.trim_start_matches(REFERENCE_SYMBOL);
+    let pieces: Vec<&str> = word.split('.').collect();
+    if pieces.len() == 2 {
+        let frag_id = pieces[0];
+        let prop = pieces[1];
+        let frag = annotations.get(frag_id);
+        match frag {
+            Some(f) => match prop.to_ascii_lowercase().as_str() {
+                FILENAME_REF => Ok(f.file.to_owned()),
+                LINE_NO_REF => Ok(f.line.to_string()),
+                COL_NO_REF => Ok(f.col.to_string()),
+                LOC_REF => Ok(format!("{} ({}:{})", f.file, f.line, f.col)),
+                _ => Err(FileError {
+                    err_type: WeaveError::BadReference(prop.to_owned()),
+                    filename: filename.to_owned(),
+                    line,
+                    col,
+                }),
+            },
+            None => Err(FileError {
+                err_type: WeaveError::MissingFragment(frag_id.to_owned()),
+                filename: filename.to_owned(),
+                line,
+                col,
+            }),
+        }
+    } else {
+        // TODO Make these errors more granular.
+        Err(FileError {
+            err_type: WeaveError::BadReference(word.to_owned()),
+            filename: filename.to_owned(),
+            line,
+            col,
+        })
+    }
 }
 
 // @<tests
@@ -326,7 +476,6 @@ Fragment 1
 # Mostly this is useful for keeping Verso out of uninteresting areas, like these tests.
 
 # >@ This would cause an error.",
-
             "test.py",
         );
 
@@ -395,6 +544,8 @@ Fragment 1
         let text = "This is the first line!
 
 @@1
+@?1.file (@?1.line:@?1.col)
+@?1.loc
 
 Another line.";
 
@@ -416,6 +567,8 @@ Another line.";
                 "This is the first line!
 
 {Example Code}
+example.code (1:0)
+example.code (1:0)
 
 Another line."
             )
