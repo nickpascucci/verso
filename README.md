@@ -76,6 +76,17 @@ by the ID of the annotation (e.g. `@@12345`). When the file is woven using the `
 the next section), the line will be replaced with the contents of the annotation. You can add any
 markup you like around the line to provide formatting.
 
+Sometimes it is also desirable to refer to metadata about an annotation. Currently, `verso|recto`
+supports the following metadata insertion operators:
+
+1. _Filename._ `@?id.file` inserts the name of the file the annotation was drawn from.
+2. _Line number._ `@?id.line` inserts the line number on which the annotation began.
+3. _Column number._ `@?id.col` inserts the column number at which the annotation began. (Currently
+   this value is always 0, as annotations always begin at the start of a line.)
+4. _Quick location._ `@?id.loc` inserts the file name, starting line number, and column number for
+   the annotation in the format `file (line:col)`. This is useful if you just want to quickly refer
+   to the metadata without futzing with the formatting.
+
 ### Weaving a document for human consumption
 
 The `verso` command will read all of the annotations from the files specified on the command line,
