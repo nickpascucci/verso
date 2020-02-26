@@ -48,6 +48,7 @@ pub struct FileError<T: fmt::Debug> {
     filename: String,
     line: usize,
     col: usize,
+    message: Option<String>,
 }
 // >@errors
 
@@ -57,8 +58,12 @@ impl<T: fmt::Debug> fmt::Display for FileError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{:?} in {}: line {}, column {}",
-            self.err_type, self.filename, self.line, self.col
+            "Error: ({}:{}:{}) {:?} {}",
+            self.filename,
+            self.line,
+            self.col,
+            self.err_type,
+            self.message.to_owned().unwrap_or_default()
         )
     }
 }
@@ -80,6 +85,10 @@ pub fn extract_fragments(
                         filename: filename.to_owned(),
                         line,
                         col,
+                        message: Some(format!(
+                            "found a block close symbol when no block is active: {}",
+                            line
+                        )),
                     });
                 }
 
@@ -104,6 +113,10 @@ pub fn extract_fragments(
                             filename: filename.to_owned(),
                             line,
                             col,
+                            message: Some(format!(
+                                "no fragment identifier found in block open symbol: {}",
+                                line
+                            )),
                         });
                     }
                 }
@@ -123,6 +136,10 @@ pub fn extract_fragments(
                         filename: filename.to_owned(),
                         line,
                         col,
+                        message: Some(format!(
+                            "found a block open symbol while a block is already opened: {}",
+                            line
+                        )),
                     });
                 }
 
@@ -132,6 +149,10 @@ pub fn extract_fragments(
                         filename: filename.to_owned(),
                         line,
                         col,
+                        message: Some(format!(
+                            "halt symbol found while a block was open: {}",
+                            line
+                        )),
                     });
                 }
 
@@ -172,7 +193,7 @@ pub fn weave(
 
     for (line_no, line) in contents.lines().enumerate().map(|(l, c)| (l + 1, c)) {
         if line.trim_start().starts_with(INSERTION_SYMBOL) {
-            let id = extract_id(line, INSERTION_SYMBOL.len());
+            let id = extract_id(line.trim_start(), INSERTION_SYMBOL.len());
             match id {
                 Some(id) => {
                     let fragment = annotations.get(&id);
@@ -185,6 +206,7 @@ pub fn weave(
                                 filename: filename.to_owned(),
                                 line: line_no,
                                 col: INSERTION_SYMBOL.len(),
+                                message: Some(format!("no fragment found with identifier {}", id)),
                             })
                         }
                     }
@@ -195,6 +217,7 @@ pub fn weave(
                         filename: filename.to_owned(),
                         line: line_no,
                         col: 0,
+                        message: Some(format!("no fragment identifier found in line: {}", line)),
                     })
                 }
             }
@@ -249,6 +272,10 @@ fn expand_references(
                         filename: filename.to_owned(),
                         line: line_no,
                         col,
+                        message: Some(format!(
+                            "unexpected character '{}' while reading reference symbol in line {}",
+                            c, line
+                        )),
                     });
                 }
             }
@@ -262,6 +289,10 @@ fn expand_references(
                             filename: filename.to_owned(),
                             line: line_no,
                             col,
+                            message: Some(format!(
+                                "expected '.', got '{}' while reading reference symbol in line {}",
+                                c, line
+                            )),
                         });
                     };
                 }
@@ -329,6 +360,7 @@ fn expand_reference(
                     filename: filename.to_owned(),
                     line,
                     col: col + frag_id.len() + 1,
+                    message: Some(format!("unknown reference type '{}'", prop)),
                 }),
             },
             None => Err(FileError {
@@ -336,6 +368,7 @@ fn expand_reference(
                 filename: filename.to_owned(),
                 line,
                 col,
+                message: Some(format!("unknown fragment '{}'", frag_id)),
             }),
         }
     } else {
@@ -345,6 +378,7 @@ fn expand_reference(
             filename: filename.to_owned(),
             line,
             col,
+            message: Some(format!("malformed property lookup '{}'", word)),
         })
     }
 }
@@ -546,6 +580,7 @@ Fragment 1
         let text = "This is the first line!
 
 @@1
+  @@1
 @?1.file (@?1.line:@?1.col)
 @?1.loc
 
@@ -568,6 +603,7 @@ Another line.";
             String::from(
                 "This is the first line!
 
+{Example Code}
 {Example Code}
 example.code (1:0)
 example.code (1:0)
@@ -608,7 +644,8 @@ Another line.";
         let mut annotations = HashMap::new();
         annotations.insert(frag.id.to_owned(), frag.to_owned());
 
-        let err = weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+        let err =
+            weave("test", &text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::UnknownProperty(s),
@@ -618,7 +655,11 @@ Another line.";
             } => {
                 assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
                 assert_eq!(col, 4, "Expected error on col 4, found col {:?}", col);
-                assert_eq!(s, "foo", "Expected error message to be \"foo\", got {:?}", s);
+                assert_eq!(
+                    s, "foo",
+                    "Expected error message to be \"foo\", got {:?}",
+                    s
+                );
             }
             _ => panic!("Expected WeaveError::UnknownProperty, got {:?}", err),
         }
@@ -634,7 +675,8 @@ Another line.";
 
         let annotations = HashMap::new();
 
-        let err = weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+        let err =
+            weave("test", &text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::MissingFragment(s),
