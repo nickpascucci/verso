@@ -9,6 +9,7 @@ const BLOCK_CLOSE_SYMBOL: &'static str = concat!(">", "@");
 const INSERTION_SYMBOL: &'static str = "@@";
 const REFERENCE_SYMBOL: &'static str = "@?";
 const HALT_SYMBOL: &'static str = "@!halt";
+const ID_SAFE_CHARS: &'static [char] = &['/'];
 
 const FILENAME_REF: &'static str = "file";
 const LINE_NO_REF: &'static str = "line";
@@ -175,7 +176,9 @@ pub fn extract_fragments(
 // @<extractid
 fn extract_id(content: &str, col: usize) -> Option<String> {
     let it = content.chars().skip(col);
-    let id: String = it.take_while(|c| c.is_alphanumeric()).collect();
+    let id: String = it
+        .take_while(|c| c.is_alphanumeric() || ID_SAFE_CHARS.contains(c))
+        .collect();
     if id.is_empty() {
         None
     } else {
@@ -229,7 +232,14 @@ pub fn weave(
         }
     }
 
-    return Ok(substrings.join("\n"));
+    // Account for final newline, which str.lines() may drop.
+    if contents.ends_with('\n') && substrings.last().map_or(true, |c| !c.contains("\n")) {
+        substrings.push("".to_owned());
+    }
+
+    let document = substrings.join("\n");
+
+    return Ok(document);
 }
 
 #[derive(Debug, PartialEq, Clone)]

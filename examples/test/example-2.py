@@ -2,6 +2,6 @@ import sys
 
 FOO = "BAR"
 
-# @<2
+# @<examples/3
 assert(1 == 2)
-# >@2
+# >@examples/3
