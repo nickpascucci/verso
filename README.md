@@ -67,8 +67,10 @@ referenced by other documents.
 
 Annotations are quite simple. To mark a region of code for reference, simply add a pair of comments
 around the region with the symbols `@<` and `>@`, followed by a unique ID. The ID can be any string
-of non-whitespace characters, though it should be both unique within your project and valid in the
-source file you're annotating.
+of alphanumeric characters and the characters `/`, `_`, or `-`, though it should be both unique
+within your project and valid in the source file you're annotating. The period character (`.`) is
+reserved, as it is used for references. Other characters may be added in the future. If a character
+you want to use is not listed here, please file an issue on GitHub (or better yet, send a PR)!
 
 ### Referencing annotations
 

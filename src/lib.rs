@@ -4,12 +4,17 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
+// These are built using compile-time macros so that verso does not see them as starting a block in
+// this file.
 const BLOCK_OPEN_SYMBOL: &'static str = concat!("@", "<");
 const BLOCK_CLOSE_SYMBOL: &'static str = concat!(">", "@");
+
+const ID_SAFE_CHARS: &'static [char] = &['/', '_', '-'];
+
+const HALT_SYMBOL: &'static str = "@!halt";
 const INSERTION_SYMBOL: &'static str = "@@";
 const REFERENCE_SYMBOL: &'static str = "@?";
-const HALT_SYMBOL: &'static str = "@!halt";
-const ID_SAFE_CHARS: &'static [char] = &['/'];
+const REFERENCE_SEPARATOR: char = '.';
 
 const FILENAME_REF: &'static str = "file";
 const LINE_NO_REF: &'static str = "line";
@@ -26,10 +31,17 @@ pub struct Fragment {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum IdExtractError {
+    NoIdFound,
+    ReservedCharacterUsed(char),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParseError {
     DoubleOpen,
     CloseBeforeOpen,
     MissingId,
+    IdExtractError,
     HaltWhileOpen,
 }
 
@@ -38,6 +50,7 @@ pub enum ParseError {
 pub enum WeaveError {
     MissingFragment(String),
     MissingId,
+    IdExtractError,
     ReferenceParseError,
     BadReference(String),
     UnknownProperty(String),
@@ -66,6 +79,21 @@ impl<T: fmt::Debug> fmt::Display for FileError<T> {
             self.err_type,
             self.message.to_owned().unwrap_or_default()
         )
+    }
+}
+
+trait IdSafe {
+    fn is_safe_for_ids(&self) -> bool;
+    fn is_safe_for_refs(&self) -> bool;
+}
+
+impl IdSafe for char {
+    fn is_safe_for_ids(&self) -> bool {
+        self.is_alphanumeric() || ID_SAFE_CHARS.contains(self)
+    }
+
+    fn is_safe_for_refs(&self) -> bool {
+        self.is_alphanumeric()
     }
 }
 
@@ -99,26 +127,42 @@ pub fn extract_fragments(
 
                 if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
                     // If the line contains a start marker, begin a fragment file.
-                    if let Some(id) = extract_id(content, col + BLOCK_OPEN_SYMBOL.len()) {
-                        fragment = Some(Fragment {
-                            body: String::new(),
-                            id,
-                            // The fragment to extract starts at the beginning of the next line.
-                            line: line + 1,
-                            col: 0,
-                            file: filename.to_owned(),
-                        });
-                    } else {
-                        return Err(FileError {
-                            err_type: ParseError::MissingId,
-                            filename: filename.to_owned(),
-                            line,
-                            col,
-                            message: Some(format!(
-                                "no fragment identifier found in block open symbol: {}",
-                                line
-                            )),
-                        });
+                    match extract_id(content, col + BLOCK_OPEN_SYMBOL.len()) {
+                        Ok(id) => {
+                            fragment = Some(Fragment {
+                                body: String::new(),
+                                id,
+                                // The fragment to extract starts at the beginning of the next line.
+                                line: line + 1,
+                                col: 0,
+                                file: filename.to_owned(),
+                            });
+                        }
+                        Err(IdExtractError::NoIdFound) => {
+                            return Err(FileError {
+                                err_type: ParseError::MissingId,
+                                filename: filename.to_owned(),
+                                line,
+                                col,
+                                message: Some(format!(
+                                    "no fragment identifier found in block open symbol: {}",
+                                    line
+                                )),
+                            });
+                        }
+                        Err(IdExtractError::ReservedCharacterUsed(c)) => {
+                            return Err(FileError {
+                                err_type: ParseError::IdExtractError,
+                                filename: filename.to_owned(),
+                                line,
+                                col,
+                                message: Some(format!(
+                                    "error parsing fragment identifier in block open symbol: {}
+                                     (used reserved character {})",
+                                    line, c
+                                )),
+                            });
+                        }
                     }
                 }
             }
@@ -174,15 +218,17 @@ pub fn extract_fragments(
 }
 
 // @<extractid
-fn extract_id(content: &str, col: usize) -> Option<String> {
+fn extract_id(content: &str, col: usize) -> Result<String, IdExtractError> {
     let it = content.chars().skip(col);
-    let id: String = it
-        .take_while(|c| c.is_alphanumeric() || ID_SAFE_CHARS.contains(c))
-        .collect();
+    let id: String = it.take_while(|c| !c.is_whitespace()).collect();
     if id.is_empty() {
-        None
+        Err(IdExtractError::NoIdFound)
+    } else if let Some(idx) = id.find(|c: char| !c.is_safe_for_ids()) {
+        Err(IdExtractError::ReservedCharacterUsed(
+            id.chars().nth(idx).unwrap(),
+        ))
     } else {
-        Some(id)
+        Ok(id)
     }
 }
 // >@extractid
@@ -198,7 +244,7 @@ pub fn weave(
         if line.trim_start().starts_with(INSERTION_SYMBOL) {
             let id = extract_id(line.trim_start(), INSERTION_SYMBOL.len());
             match id {
-                Some(id) => {
+                Ok(id) => {
                     let fragment = annotations.get(&id);
                     match fragment {
                         // TODO Add indexing information.
@@ -214,13 +260,26 @@ pub fn weave(
                         }
                     }
                 }
-                None => {
+                Err(IdExtractError::NoIdFound) => {
                     return Err(FileError {
                         err_type: WeaveError::MissingId,
                         filename: filename.to_owned(),
                         line: line_no,
                         col: 0,
                         message: Some(format!("no fragment identifier found in line: {}", line)),
+                    })
+                }
+                Err(IdExtractError::ReservedCharacterUsed(c)) => {
+                    return Err(FileError {
+                        err_type: WeaveError::IdExtractError,
+                        filename: filename.to_owned(),
+                        line: line_no,
+                        col: 0,
+                        message: Some(format!(
+                            "error parsing fragment identifier in block open symbol: {}
+                             (used reserved character {})",
+                            line, c
+                        )),
                     })
                 }
             }
@@ -290,8 +349,8 @@ fn expand_references(
                 }
             }
             ScannerState::ReadingId => {
-                if !c.is_alphanumeric() {
-                    if c == '.' {
+                if !c.is_safe_for_ids() {
+                    if c == REFERENCE_SEPARATOR {
                         state = ScannerState::ReadingRefType;
                     } else {
                         return Err(FileError {
@@ -300,8 +359,8 @@ fn expand_references(
                             line: line_no,
                             col,
                             message: Some(format!(
-                                "expected '.', got '{}' while reading reference symbol in line {}",
-                                c, line
+                                "expected '{}', got '{}' while reading reference symbol in line {}",
+                                REFERENCE_SEPARATOR, c, line
                             )),
                         });
                     };
@@ -309,7 +368,7 @@ fn expand_references(
             }
             ScannerState::ReadingRefType => {
                 // TODO Clean up this code a little, to reduce duplication.
-                if !c.is_alphanumeric() {
+                if !c.is_safe_for_refs() {
                     state = ScannerState::SearchingForRefStart;
                     let expansion = expand_reference(
                         &line[start_col..col],
@@ -354,7 +413,7 @@ fn expand_reference(
 ) -> Result<String, FileError<WeaveError>> {
     let word = word.trim_start_matches(REFERENCE_SYMBOL);
     let col = col + REFERENCE_SYMBOL.len(); // Offset column to account for the symbol we removed.
-    let pieces: Vec<&str> = word.split('.').collect();
+    let pieces: Vec<&str> = word.split(REFERENCE_SEPARATOR).collect();
     if pieces.len() == 2 {
         let frag_id = pieces[0];
         let prop = pieces[1];
@@ -401,7 +460,12 @@ mod tests {
     #[test]
     fn test_extract_id_missing() {
         let id = extract_id(&String::from(""), 0);
-        assert_eq!(id, None, "Expected None, got {:?}", id);
+        assert_eq!(
+            id,
+            Err(IdExtractError::NoIdFound),
+            "Expected NoIdFound, got {:?}",
+            id
+        );
     }
     // ... snip ...
     // >@tests
@@ -418,15 +482,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_id_nonalphanumeric() {
-        let id = extract_id(&String::from("foo-bar-baz"), 0);
-        assert_eq!(
-            id.expect("Expected successful ID extraction"),
-            String::from("foo")
-        );
-    }
-
-    #[test]
     fn test_extract_id_whitespace() {
         let id = extract_id(&String::from("foo bar baz quuz"), 0);
         assert_eq!(
@@ -436,8 +491,35 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_id_acceptable_separators() {
+        let id_elements = ["foo", "bar", "baz", "quuz"];
+        for sep in ID_SAFE_CHARS {
+            let input = &id_elements.join(&sep.to_string());
+            let id = extract_id(input, 0);
+            assert_eq!(&id.expect("Expected successful ID extraction"), input);
+        }
+    }
+
+    #[test]
+    fn test_extract_id_reserved_chars() {
+        let id_elements = ["foo", "bar", "baz", "quuz"];
+        let id_reserved_chars = &[REFERENCE_SEPARATOR];
+        for sep in id_reserved_chars {
+            let input = &id_elements.join(&sep.to_string());
+            let id = extract_id(input, 0);
+            assert_eq!(
+                id.expect_err(&format!(
+                    "Expected ID extraction to fail due to reserved char '{}'",
+                    sep
+                )),
+                IdExtractError::ReservedCharacterUsed(*sep)
+            );
+        }
+    }
+
+    #[test]
     fn test_extract_id_offset() {
-        let id = extract_id(&String::from("foo-bar-baz quuz"), 4);
+        let id = extract_id(&String::from("foo bar baz quuz"), 4);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
             String::from("bar")
