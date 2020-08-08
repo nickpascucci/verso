@@ -97,11 +97,25 @@ impl IdSafe for char {
     }
 }
 
+fn sanitize(s: &str) -> String {
+    s.chars().map(|c| if c.is_safe_for_ids() {
+        c
+    } else {
+        '_'
+    }).collect()
+}
+
 pub fn extract_fragments(
     contents: &str,
     filename: &str,
 ) -> Result<Vec<Fragment>, FileError<ParseError>> {
-    let mut fragments: Vec<Fragment> = vec![];
+    let mut fragments: Vec<Fragment> = vec![Fragment {
+        body: contents.to_owned(),
+        id: sanitize(filename),
+        file: filename.to_owned(),
+        line: 1,
+        col: 0,
+    }];
 
     let mut fragment: Option<Fragment> = None;
 
@@ -528,8 +542,7 @@ mod tests {
 
     #[test]
     fn test_extract_fragments() {
-        let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
-            "# This is an example
+        let body = "# This is an example
 import sys
 
 # @<foobarbaz The fragment starts and its ID is defined on this line; it is foobarbaz.
@@ -537,30 +550,54 @@ def main():
     do_stuff()
     make_awesome()
     # >@ This line ends the fragment.
-    sys.exit(1) # oops",
-            "test.py",
-        );
+    sys.exit(1) # oops";
+        let filename = "example/test.py";
+
+        let fragments: Result<Vec<Fragment>, FileError<ParseError>> =
+            extract_fragments(body, filename);
 
         let fragments = fragments.expect("Expected no parse errors");
         assert!(
-            fragments.len() == 1,
-            "Expected one fragment, found {}",
+            fragments.len() == 2,
+            "Expected two fragments, found {}",
             fragments.len()
         );
         assert!(
+            fragments[0].body == body.to_string(),
+            "Unexpected code fragment {:?}",
             fragments[0].body
+        );
+        assert!(
+            fragments[0].id == "example/test_py",
+            "Unexpected ID {:?}",
+            fragments[0].id
+        );
+
+        assert!(
+            fragments[1].body
                 == String::from(
                     "def main():
     do_stuff()
     make_awesome()"
                 ),
             "Unexpected code fragment {:?}",
-            fragments[0].body
+            fragments[1].body
+        );
+
+        assert!(
+            fragments[1].body
+                == String::from(
+                    "def main():
+    do_stuff()
+    make_awesome()"
+                ),
+            "Unexpected code fragment {:?}",
+            fragments[1].body
         );
         assert!(
-            fragments[0].id == String::from("foobarbaz"),
+            fragments[1].id == String::from("foobarbaz"),
             "Unexpected ID {:?}",
-            fragments[0].id
+            fragments[1].id
         );
     }
 
@@ -609,8 +646,8 @@ Fragment 1
 
         let fragments = fragments.expect("Expected a clean read");
         assert!(
-            fragments.len() == 1,
-            "Expected one fragment, found {}",
+            fragments.len() == 2,
+            "Expected two fragments, found {}",
             fragments.len()
         );
     }

@@ -16,4 +16,22 @@ if __name__ == "__main__":
     main()
 ```
 
+Finally, this is the entire file:
+
+```
+import sys
+
+def main():
+    #@<examples/1
+    print("Hello, World!")
+    sys.exit(1)
+    #>@examples/1
+
+#@<examples/2
+if __name__ == "__main__":
+    main()
+#>@examples/2
+
+```
+
 _Hopefully, that has some content!_

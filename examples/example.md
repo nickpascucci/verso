@@ -14,4 +14,10 @@ There is also this annotated region with the ID `examples/2`:
 @@examples/2
 ```
 
+Finally, this is the entire file:
+
+```
+@@example_py
+```
+
 _Hopefully, that has some content!_
