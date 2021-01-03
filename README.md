@@ -26,7 +26,7 @@ approach:
    to read.
 
 Overall this is an improvement on inline documentation and can provide much more context to the
-reader than mainstream approaches:
+reader than mainstream approaches. Unfortunately it does suffer some serious drawbacks as well:
 
 - The source code is embedded within a document, making it inaccessible to language-specific tooling
   such as editors, compilers, and static analysis tools. In order to use these the code must first
@@ -41,7 +41,7 @@ reader than mainstream approaches:
 be referenced by the documentation. Rather than embedding source code in documents, or documents in
 source code, lightweight annotations are used to mark sections of interest within the code which can
 be easily referenced by prose documents. There is no `tangle` step, and source files remain fully
-valid inputs for compilers, editors, and other tools. There is no need to maintain line numbers or
+valid inputs for compilers, editors, and other tools. There is no need to translate line numbers or
 formatting between literate sources and what the compiler sees.
 
 ## What traditional LP systems get right
@@ -109,10 +109,10 @@ Each of the woven files is written to the output directory, provided as the firs
 same relative location as given on the command line. So, for example, the file `blog/home.md` above
 will be written to `build/blog/home.md` when it is woven.
 
-Note that, although the two programs run in parallel, `verso` won't send input to `recto` until it
-has successfully extracted annotations from all of the source files it was given and that `recto`
-will not start weaving files together until it receives those annotations. Because of this if
-`verso` fails, `recto` will also fail.
+Note that, although the two programs appear to run in parallel, `verso` won't send input to `recto`
+until it has successfully extracted annotations from all of the source files it was given and that
+`recto` will not start weaving files together until it receives those annotations. Because of this
+if `verso` fails, `recto` will also fail.
 
 ## The Name
 
