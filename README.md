@@ -90,6 +90,12 @@ supports the following metadata insertion operators:
    the annotation in the format `file (line:col)`. This is useful if you just want to quickly refer
    to the metadata without futzing with the formatting.
 
+### Implicit annotations
+
+In addition to user annotations, the system provides a fragment for each input file containing the
+full contents of the file. These are identified by transforming any non-ID-safe characters in the
+file name into underscores.
+
 ### Weaving a document for human consumption
 
 The `verso` command will read all of the annotations from the files specified on the command line,
