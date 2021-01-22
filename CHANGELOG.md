@@ -41,15 +41,22 @@ updated throughout the repository.
 
 ## [Unreleased]
 
-## v0.1.1
+## v0.1.2
 
 ### Added
+
 - Two new reference operators are now available in `recto`: `relpath` and
   `abspath`. `relpath` inserts the relative path from the current file to the
   fragment's source file while `abspath` inserts the absolute path of the
   fragment file, considering the directory in which `verso` was run as the
   root. (For example, if `verso` is run in directory `/a` and `/a/b.py` contains
   a fragment, then that fragment's `abspath` is `/b.py`.)
+
+## v0.1.1
+
+### Fixed
+
+- Repaired bugs in logic that would reject valid IDs and consolidated the code.
 
 ## v0.1.0
 
