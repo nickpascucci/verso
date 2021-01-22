@@ -20,6 +20,8 @@ const FILENAME_REF: &'static str = "file";
 const LINE_NO_REF: &'static str = "line";
 const COL_NO_REF: &'static str = "col";
 const LOC_REF: &'static str = "loc";
+const ABS_PATH_REF: &'static str = "abspath";
+const REL_PATH_REF: &'static str = "relpath";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Fragment {
@@ -335,7 +337,7 @@ fn expand_references(
                 let chars_read = col - start_col;
                 if chars_read >= REFERENCE_SYMBOL.len() {
                     state = ScannerState::ReadingId;
-                } else if c != REFERENCE_SYMBOL.chars().nth(chars_read).expect("") {
+                } else if c != REFERENCE_SYMBOL.chars().nth(chars_read).unwrap() {
                     return Err(FileError {
                         err_type: WeaveError::ReferenceParseError,
                         filename: filename.to_owned(),
@@ -424,6 +426,14 @@ fn expand_reference(
                 LINE_NO_REF => Ok(f.line.to_string()),
                 COL_NO_REF => Ok(f.col.to_string()),
                 LOC_REF => Ok(format!("{} ({}:{})", f.file, f.line, f.col)),
+                ABS_PATH_REF => Ok(format!("/{}", f.file)),
+                REL_PATH_REF => {
+                    let from_path = std::path::Path::new(filename);
+                    let to_path = std::path::Path::new(&f.file);
+                    let rel_path =
+                        find_relative_path(&from_path.to_path_buf(), &to_path.to_path_buf());
+                    Ok(rel_path.to_string_lossy().to_string())
+                }
                 _ => Err(FileError {
                     err_type: WeaveError::UnknownProperty(prop.to_owned()),
                     filename: filename.to_owned(),
@@ -450,6 +460,45 @@ fn expand_reference(
             message: Some(format!("malformed property lookup '{}'", word)),
         })
     }
+}
+
+fn find_relative_path(a: &std::path::PathBuf, b: &std::path::PathBuf) -> std::path::PathBuf {
+    let apcs = a.components();
+    let mut bpcs = b.components();
+    let mut ups = std::path::PathBuf::new();
+    let mut downs = std::path::PathBuf::new();
+
+    // Cut off shared prefix.
+    let mut prefix_read = false;
+    for apc in apcs {
+        if !prefix_read {
+            match bpcs.next() {
+                Some(_x) if _x.eq(&apc) => {
+                    // Path components match; ignore them.
+                    continue;
+                }
+                Some(x) => {
+                    // Mismatch! End of shared prefix.
+                    prefix_read = true;
+                    downs.push(x);
+                }
+                None => {
+                    // Ran out of path components, all of which were shared.
+                    downs.push(".");
+                }
+            }
+        } else {
+            // Add enough "parent dir" tokens to get to shared directory path from A
+            ups.push("..");
+        }
+    }
+
+    // Add all of the remaining path components in B's path
+    for bpc in bpcs {
+        downs.push(bpc);
+    }
+
+    ups.join(downs)
 }
 
 // @<tests
@@ -781,6 +830,30 @@ Another line.";
                 assert_eq!(s, "1", "Expected error message to be \"1\", got {:?}", s);
             }
             _ => panic!("Expected WeaveError::MissingFragment, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_find_relative_path() {
+        {
+            let a = std::path::PathBuf::from("/a/b/c/d.foo");
+            let b = std::path::PathBuf::from("/a/b/e/f/g.bar");
+            let rel_path = find_relative_path(&a, &b);
+            assert_eq!(rel_path, std::path::PathBuf::from("../e/f/g.bar"));
+        }
+
+        {
+            let a = std::path::PathBuf::from("/a/b/c/d.foo");
+            let b = std::path::PathBuf::from("/a/g.bar");
+            let rel_path = find_relative_path(&a, &b);
+            assert_eq!(rel_path, std::path::PathBuf::from("../../g.bar"));
+        }
+
+        {
+            let a = std::path::PathBuf::from("/a/b/c/d.foo");
+            let b = std::path::PathBuf::from("/e/f/g.bar");
+            let rel_path = find_relative_path(&a, &b);
+            assert_eq!(rel_path, std::path::PathBuf::from("../../../e/f/g.bar"));
         }
     }
 }

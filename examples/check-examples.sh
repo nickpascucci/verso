@@ -17,12 +17,17 @@ cd examples
 rm -rf $OUTPUT_DIRECTORY || true
 
 ../target/debug/verso $SOURCE_FILES \
+    | tee /tmp/verso.json \
     | ../target/debug/recto $OUTPUT_DIRECTORY $PROSE_FILES
 
 GENFILES=$(find $OUTPUT_DIRECTORY -type f | sed "s|$OUTPUT_DIRECTORY/||")
 
+function md5() {
+    md5sum $1 | awk '{ print $1 }'
+}
+
 function same_checksum() {
-    [ $(md5 -q $1) = $(md5 -q $2) ]
+    [ $(md5 $1) = $(md5 $2) ]
 }
 
 DIFFS_FOUND=0

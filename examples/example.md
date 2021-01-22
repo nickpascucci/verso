@@ -15,3 +15,11 @@ There is also this annotated region with the ID `examples/2`:
 ```
 
 _Hopefully, that has some content!_
+
+This is an example of a relative path:
+
+@?examples/1.relpath
+
+... and an absolute one:
+
+@?examples/1.abspath

@@ -17,3 +17,11 @@ if __name__ == "__main__":
 ```
 
 _Hopefully, that has some content!_
+
+This is an example of a relative path:
+
+example.py
+
+... and an absolute one:
+
+/example.py
