@@ -36,7 +36,7 @@ impl Config {
         }
 
         let out_dir = String::from(&args[1]);
-        let filenames = args[2..].iter().cloned().collect();
+        let filenames = args[2..].to_vec();
 
         Ok(Config { out_dir, filenames })
     }
@@ -69,9 +69,8 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
         let out_file = Path::new(&cfg.out_dir).join(&filename);
 
         // Create subdirectories if needed.
-        match out_file.parent() {
-            Some(out_subdir) => fs::create_dir_all(&out_subdir)?,
-            None => (),
+        if let Some(out_subdir) = out_file.parent() {
+            fs::create_dir_all(&out_subdir)?
         }
 
         eprintln!("Writing result to {:?}...", out_file);

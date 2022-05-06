@@ -9,18 +9,18 @@ _Norman Ramsey, on the [noweb homepage](https://www.cs.tufts.edu/~nr/noweb/)._
 
 Literate Programming (LP) tries to address a common problem with software systems: by reading the
 code one can discover _how_ a thing is done, but not _why_ it is done that way. Every program has a
-theory of operation embedded within its logic, but this is often hidden. Comments within the code
+"theory of operation" embedded within its logic, but this is often hidden. Comments within the code
 and documentation of APIs are helpful but insufficient for this task. Often the documentation
 generation systems provided with a programming language do not provide a way to contextualize the
 code they describe within the larger system. For programs which rely on a more advanced mathematical
 background, it is also often difficult to embed equations or other markup in the documentation.
 
-Existing LP tools such as WEB, noweb, and Org Babel attempt to address this by taking the following
-approach:
+Existing LP tools such as _WEB_, _noweb_, and _Org Babel_ attempt to address this by taking the
+following approach:
 
 1. Embed the program source code within a prose document which explains the author's thinking.
-2. Provide mechanisms for abstracting code into abstract chunks, which can be recombined in
-   different orders than they are defined and referenced throughought the document.
+2. Provide mechanisms for organizing code into abstract chunks, which can be recombined in
+   different orders than they are defined and referenced throughout the document.
 3. Process the combined document in one of two ways: either `tangle` the source code out of the
    document into a computer-friendly version, or `weave` the document into a form ready for humans
    to read.
@@ -28,9 +28,9 @@ approach:
 Overall this is an improvement on inline documentation and can provide much more context to the
 reader than mainstream approaches. Unfortunately it does suffer some serious drawbacks as well:
 
-- The source code is embedded within a document, making it inaccessible to language-specific tooling
-  such as editors, compilers, and static analysis tools. In order to use these the code must first
-  be tangled.
+- The source code is embedded within a markup file, making it inaccessible to language-specific
+  tooling such as editors, compilers, and static analysis tools. In order to use these the code must
+  first be tangled.
 - Similarly, to build your literate program the end user must have the appropriate tools installed
   in addition to the language tooling needed to compile the source.
 - Most programmers have spent years working directly in the machine-friendly source representation

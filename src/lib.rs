@@ -6,22 +6,22 @@ use std::fmt;
 
 // These are built using compile-time macros so that verso does not see them as starting a block in
 // this file.
-const BLOCK_OPEN_SYMBOL: &'static str = concat!("@", "<");
-const BLOCK_CLOSE_SYMBOL: &'static str = concat!(">", "@");
+const BLOCK_OPEN_SYMBOL: &str = concat!("@", "<");
+const BLOCK_CLOSE_SYMBOL: &str = concat!(">", "@");
 
-const ID_SAFE_CHARS: &'static [char] = &['/', '_', '-'];
+const ID_SAFE_CHARS: &[char] = &['/', '_', '-'];
 
-const HALT_SYMBOL: &'static str = "@!halt";
-const INSERTION_SYMBOL: &'static str = "@@";
-const REFERENCE_SYMBOL: &'static str = "@?";
+const HALT_SYMBOL: &str = "@!halt";
+const INSERTION_SYMBOL: &str = "@@";
+const REFERENCE_SYMBOL: &str = "@?";
 const REFERENCE_SEPARATOR: char = '.';
 
-const FILENAME_REF: &'static str = "file";
-const LINE_NO_REF: &'static str = "line";
-const COL_NO_REF: &'static str = "col";
-const LOC_REF: &'static str = "loc";
-const ABS_PATH_REF: &'static str = "abspath";
-const REL_PATH_REF: &'static str = "relpath";
+const FILENAME_REF: &str = "file";
+const LINE_NO_REF: &str = "line";
+const COL_NO_REF: &str = "col";
+const LOC_REF: &str = "loc";
+const ABS_PATH_REF: &str = "abspath";
+const REL_PATH_REF: &str = "relpath";
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Fragment {
@@ -107,7 +107,7 @@ pub fn extract_fragments(
 
     let mut fragment: Option<Fragment> = None;
 
-    for (line, content) in contents.split("\n").enumerate().map(|(l, c)| (l + 1, c)) {
+    for (line, content) in contents.split('\n').enumerate().map(|(l, c)| (l + 1, c)) {
         match &fragment {
             None => {
                 if let Some(col) = content.find(BLOCK_CLOSE_SYMBOL) {
@@ -123,7 +123,7 @@ pub fn extract_fragments(
                     });
                 }
 
-                if let Some(_) = content.find(HALT_SYMBOL) {
+                if content.contains(HALT_SYMBOL) {
                     break;
                 }
 
@@ -171,7 +171,7 @@ pub fn extract_fragments(
 
             Some(f) => {
                 // If the line contains an end marker, end the fragment if one exists.
-                if let Some(_) = content.find(BLOCK_CLOSE_SYMBOL) {
+                if content.contains(BLOCK_CLOSE_SYMBOL) {
                     fragments.push(f.to_owned());
                     fragment = None;
                     continue;
@@ -286,7 +286,7 @@ pub fn weave(
                 }
             }
         } else if line.contains(REFERENCE_SYMBOL) {
-            let expanded = expand_references(&line, &filename, line_no, &annotations)?;
+            let expanded = expand_references(line, filename, line_no, annotations)?;
             substrings.push(expanded);
         } else {
             substrings.push(line.to_owned());
@@ -294,13 +294,13 @@ pub fn weave(
     }
 
     // Account for final newline, which str.lines() may drop.
-    if contents.ends_with('\n') && substrings.last().map_or(true, |c| !c.contains("\n")) {
+    if contents.ends_with('\n') && substrings.last().map_or(true, |c| !c.contains('\n')) {
         substrings.push("".to_owned());
     }
 
     let document = substrings.join("\n");
 
-    return Ok(document);
+    Ok(document)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -374,7 +374,7 @@ fn expand_references(
                     state = ScannerState::SearchingForRefStart;
                     let expansion = expand_reference(
                         &line[start_col..col],
-                        &filename,
+                        filename,
                         line_no,
                         start_col,
                         annotations,
@@ -386,7 +386,7 @@ fn expand_references(
                     let col = col + 1; // NOTE This differs from the block above.
                     let expansion = expand_reference(
                         &line[start_col..col],
-                        &filename,
+                        filename,
                         line_no,
                         start_col,
                         annotations,
@@ -462,7 +462,7 @@ fn expand_reference(
     }
 }
 
-fn find_relative_path(a: &std::path::PathBuf, b: &std::path::PathBuf) -> std::path::PathBuf {
+fn find_relative_path(a: &std::path::Path, b: &std::path::Path) -> std::path::PathBuf {
     let apcs = a.components();
     let mut bpcs = b.components();
     let mut ups = std::path::PathBuf::new();
@@ -598,16 +598,14 @@ def main():
         );
         assert!(
             fragments[0].body
-                == String::from(
-                    "def main():
+                == *"def main():
     do_stuff()
-    make_awesome()"
-                ),
+    make_awesome()",
             "Unexpected code fragment {:?}",
             fragments[0].body
         );
         assert!(
-            fragments[0].id == String::from("foobarbaz"),
+            fragments[0].id == *"foobarbaz",
             "Unexpected ID {:?}",
             fragments[0].id
         );
@@ -736,8 +734,8 @@ Another line.";
         };
 
         let mut annotations = HashMap::new();
-        annotations.insert(frag.id.to_owned(), frag.to_owned());
-        let result = weave("test", &text, &annotations).expect("Expected weave to return Ok");
+        annotations.insert(frag.id.to_owned(), frag);
+        let result = weave("test", text, &annotations).expect("Expected weave to return Ok");
 
         assert_eq!(
             result,
@@ -763,7 +761,7 @@ Another line."
 Another line.";
 
         let annotations = HashMap::new();
-        weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+        weave("test", text, &annotations).expect_err("Expected weave to return an error");
     }
 
     #[test]
@@ -783,10 +781,10 @@ Another line.";
         };
 
         let mut annotations = HashMap::new();
-        annotations.insert(frag.id.to_owned(), frag.to_owned());
+        annotations.insert(frag.id.to_owned(), frag);
 
         let err =
-            weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+            weave("test", text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::UnknownProperty(s),
@@ -817,7 +815,7 @@ Another line.";
         let annotations = HashMap::new();
 
         let err =
-            weave("test", &text, &annotations).expect_err("Expected weave to return an error");
+            weave("test", text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::MissingFragment(s),

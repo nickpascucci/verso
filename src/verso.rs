@@ -1,5 +1,3 @@
-use serde_json;
-
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -29,7 +27,7 @@ pub struct Config {
 
 impl Config {
     pub fn new(args: &[String]) -> Result<Config, &'static str> {
-        let filenames = args[1..].iter().cloned().collect();
+        let filenames = args[1..].to_vec();
 
         Ok(Config { filenames })
     }
