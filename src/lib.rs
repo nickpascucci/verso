@@ -1,6 +1,6 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use std::error::Error;
 use std::fmt;
@@ -259,7 +259,7 @@ fn extract_pattern(content: &str, col: usize) -> Result<Regex, PatternExtractErr
 pub fn weave(
     filename: &str,
     contents: &str,
-    annotations: &HashMap<String, Fragment>,
+    annotations: &BTreeMap<String, Fragment>,
 ) -> Result<String, FileError<WeaveError>> {
     let mut substrings: Vec<String> = vec![];
 
@@ -368,7 +368,7 @@ fn expand_references(
     line: &str,
     filename: &str,
     line_no: usize,
-    annotations: &HashMap<String, Fragment>,
+    annotations: &BTreeMap<String, Fragment>,
 ) -> Result<String, FileError<WeaveError>> {
     let mut pieces: Vec<String> = vec![];
 
@@ -464,7 +464,7 @@ fn expand_reference(
     filename: &str,
     line: usize,
     col: usize,
-    annotations: &HashMap<String, Fragment>,
+    annotations: &BTreeMap<String, Fragment>,
 ) -> Result<String, FileError<WeaveError>> {
     let word = word.trim_start_matches(REFERENCE_SYMBOL);
     let col = col + REFERENCE_SYMBOL.len(); // Offset column to account for the symbol we removed.
@@ -818,7 +818,7 @@ Another line.";
             col: 0,
         };
 
-        let mut annotations = HashMap::new();
+        let mut annotations = BTreeMap::new();
         annotations.insert(frag.id.to_owned(), frag);
         let result = weave("test", text, &annotations).expect("Expected weave to return Ok");
 
@@ -839,6 +839,40 @@ Another line."
     }
 
     #[test]
+    fn test_weave_pattern_order() {
+        let text = "@* [0-9]";
+
+        let frag1 = Fragment {
+            id: String::from("1"),
+            body: String::from("{Example Code 1}"),
+            file: String::from("example.code"),
+            line: 1,
+            col: 0,
+        };
+
+        let frag2 = Fragment {
+            id: String::from("2"),
+            body: String::from("{Example Code 2}"),
+            file: String::from("example.code"),
+            line: 2,
+            col: 0,
+        };
+
+        let mut annotations = BTreeMap::new();
+        annotations.insert(frag2.id.to_owned(), frag2);
+        annotations.insert(frag1.id.to_owned(), frag1);
+        let result = weave("test", text, &annotations).expect("Expected weave to return Ok");
+
+        assert_eq!(
+            result,
+            String::from(
+                "{Example Code 1}
+{Example Code 2}"
+            )
+        );
+    }
+
+    #[test]
     fn test_weave_missing_fragment() {
         let text = "This is the first line!
 
@@ -846,7 +880,7 @@ Another line."
 
 Another line.";
 
-        let annotations = HashMap::new();
+        let annotations = BTreeMap::new();
         weave("test", text, &annotations).expect_err("Expected weave to return an error");
     }
 
@@ -866,7 +900,7 @@ Another line.";
             col: 0,
         };
 
-        let mut annotations = HashMap::new();
+        let mut annotations = BTreeMap::new();
         annotations.insert(frag.id.to_owned(), frag);
 
         let err = weave("test", text, &annotations).expect_err("Expected weave to return an error");
@@ -897,7 +931,7 @@ Another line.";
 
 Another line.";
 
-        let annotations = HashMap::new();
+        let annotations = BTreeMap::new();
 
         let err = weave("test", text, &annotations).expect_err("Expected weave to return an error");
         match err {

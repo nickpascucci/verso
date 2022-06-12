@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use verso::{weave, Fragment};
 
@@ -44,7 +44,7 @@ impl Config {
 
 pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
     // Read annotations from stdin, and index by ID.
-    let mut annotations = HashMap::new();
+    let mut annotations = BTreeMap::new();
     {
         // Read the annotations into the map in a block to reduce memory pressure.
         let raw_annotations: Vec<Fragment> = serde_json::from_reader(io::stdin())?;
