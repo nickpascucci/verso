@@ -1,3 +1,4 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -13,6 +14,7 @@ const ID_SAFE_CHARS: &[char] = &['/', '_', '-'];
 
 const HALT_SYMBOL: &str = "@!halt";
 const INSERTION_SYMBOL: &str = "@@";
+const PATTERN_SYMBOL: &str = "@*";
 const REFERENCE_SYMBOL: &str = "@?";
 const REFERENCE_SEPARATOR: char = '.';
 
@@ -39,6 +41,12 @@ pub enum IdExtractError {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum PatternExtractError {
+    NoPatternFound,
+    RegexConstruction(regex::Error),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParseError {
     DoubleOpen,
     CloseBeforeOpen,
@@ -53,6 +61,7 @@ pub enum WeaveError {
     MissingFragment(String),
     MissingId,
     IdExtractError,
+    PatternExtractError,
     ReferenceParseError,
     BadReference(String),
     UnknownProperty(String),
@@ -235,6 +244,18 @@ fn extract_id(content: &str, col: usize) -> Result<String, IdExtractError> {
 }
 // >@extractid
 
+fn extract_pattern(content: &str, col: usize) -> Result<Regex, PatternExtractError> {
+    // Remove leading characters to get just the pattern
+    let pat = &content[col..];
+    // Remove leading and trailing whitespace; patterns should use ^/$ to include it
+    let pat = pat.trim_start().trim_end();
+    if pat.is_empty() {
+        Err(PatternExtractError::NoPatternFound)
+    } else {
+        Regex::new(pat).map_err(PatternExtractError::RegexConstruction)
+    }
+}
+
 pub fn weave(
     filename: &str,
     contents: &str,
@@ -281,6 +302,38 @@ pub fn weave(
                             "error parsing fragment identifier in block open symbol: {}
                              (used reserved character {})",
                             line, c
+                        )),
+                    })
+                }
+            }
+        } else if line.trim_start().starts_with(PATTERN_SYMBOL) {
+            let re = extract_pattern(line.trim_start(), PATTERN_SYMBOL.len());
+            match re {
+                Ok(re) => {
+                    annotations
+                        .iter()
+                        .filter(|(k, _)| re.is_match(k))
+                        .for_each(|(_, v)| substrings.push(v.body.to_owned()));
+                }
+                Err(PatternExtractError::NoPatternFound) => {
+                    return Err(FileError {
+                        err_type: WeaveError::PatternExtractError,
+                        filename: filename.to_owned(),
+                        line: line_no,
+                        col: 0,
+                        message: Some(format!("no fragment pattern found in line: {}", line)),
+                    })
+                }
+                Err(PatternExtractError::RegexConstruction(e)) => {
+                    return Err(FileError {
+                        err_type: WeaveError::PatternExtractError,
+                        filename: filename.to_owned(),
+                        line: line_no,
+                        col: 0,
+                        message: Some(format!(
+                            "error parsing fragment pattern in block open symbol: {}
+                             (regex construction failed with {})",
+                            line, e
                         )),
                     })
                 }
@@ -508,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_extract_id_missing() {
-        let id = extract_id(&String::from(""), 0);
+        let id = extract_id("", 0);
         assert_eq!(
             id,
             Err(IdExtractError::NoIdFound),
@@ -523,7 +576,7 @@ mod tests {
 
     #[test]
     fn test_extract_id_good() {
-        let id = extract_id(&String::from("foobarbaz"), 0);
+        let id = extract_id("foobarbaz", 0);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
             String::from("foobarbaz")
@@ -532,7 +585,7 @@ mod tests {
 
     #[test]
     fn test_extract_id_whitespace() {
-        let id = extract_id(&String::from("foo bar baz quuz"), 0);
+        let id = extract_id("foo bar baz quuz", 0);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
             String::from("foo")
@@ -568,10 +621,41 @@ mod tests {
 
     #[test]
     fn test_extract_id_offset() {
-        let id = extract_id(&String::from("foo bar baz quuz"), 4);
+        let id = extract_id("foo bar baz quuz", 4);
         assert_eq!(
             id.expect("Expected successful ID extraction"),
             String::from("bar")
+        );
+    }
+
+    #[test]
+    fn test_extract_pattern_good() {
+        let pattern = extract_pattern("[a-z0-9]+", 0);
+        assert!(pattern
+            .expect("Expected successful pattern extraction")
+            .is_match("abc123"));
+    }
+
+    #[test]
+    fn test_extract_pattern_missing() {
+        let pattern =
+            extract_pattern("   ", 0).expect_err("Expected error extracting empty pattern");
+        assert_eq!(
+            pattern,
+            PatternExtractError::NoPatternFound,
+            "Expected NoPatternFound, got {:?}",
+            pattern
+        );
+    }
+
+    #[test]
+    fn test_extract_pattern_invalid() {
+        let pattern =
+            extract_pattern("{[}]", 0).expect_err("Expected error extracting invalid pattern");
+        assert!(
+            matches!(pattern, PatternExtractError::RegexConstruction(_)),
+            "Expected RegexConstruction, got {:?}",
+            pattern
         );
     }
 
@@ -720,6 +804,7 @@ Fragment 1
 
 @@1
   @@1
+@* [0-9]
 @?1.file (@?1.line:@?1.col)
 @?1.loc
 
@@ -742,6 +827,7 @@ Another line.";
             String::from(
                 "This is the first line!
 
+{Example Code}
 {Example Code}
 {Example Code}
 example.code (1:0)
@@ -783,8 +869,7 @@ Another line.";
         let mut annotations = HashMap::new();
         annotations.insert(frag.id.to_owned(), frag);
 
-        let err =
-            weave("test", text, &annotations).expect_err("Expected weave to return an error");
+        let err = weave("test", text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::UnknownProperty(s),
@@ -814,8 +899,7 @@ Another line.";
 
         let annotations = HashMap::new();
 
-        let err =
-            weave("test", text, &annotations).expect_err("Expected weave to return an error");
+        let err = weave("test", text, &annotations).expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::MissingFragment(s),
