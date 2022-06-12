@@ -79,6 +79,10 @@ by the ID of the annotation (e.g. `@@12345`). When the file is woven using the `
 the next section), the line will be replaced with the contents of the annotation. You can add any
 markup you like around the line to provide formatting.
 
+To reference a group of fragments, a regular expression can be used after the `@*` symbol. All of
+the fragments whose ID matches the expression will be inserted in place of the symbol, in
+lexicographic order by their IDs.
+
 Sometimes it is also desirable to refer to metadata about an annotation. Currently, `verso|recto`
 supports the following metadata insertion operators:
 

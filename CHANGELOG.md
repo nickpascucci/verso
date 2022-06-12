@@ -41,6 +41,11 @@ updated throughout the repository.
 
 ## [Unreleased]
 
+### Added
+
+- A new weave pattern, `@* <regex>`, can be used which expands to all of the fragments whose IDs
+  match the given regular expression.
+
 ## v0.1.2
 
 ### Added
