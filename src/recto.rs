@@ -14,6 +14,17 @@ fn main() {
 
     let config = Config::new(&args).unwrap_or_else(|err| {
         eprintln!("Problem parsing arguments: {}", err);
+        eprintln!(
+            "
+Hint: The 'verso' and 'recto' tools are meant to be used together, like this:
+
+    verso main.rs lib.rs | recto build chap1.tex chap2.tex blog/home.md
+    #     ^       ^              ^     ^         ^         ^
+    #     +-------+              |     +---------+---------+
+    #     |                      |                         |
+    #     +--- Source files      +--- Output directory     +--- Prose files
+"
+        );
         process::exit(1);
     });
 
