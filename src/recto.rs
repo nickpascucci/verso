@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use verso::{weave, Fragment};
+use verso::{weave, Fragment, SymbolKey};
 
 use std::env;
 use std::error::Error;
@@ -54,6 +54,8 @@ impl Config {
 }
 
 pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
+    let symbols = SymbolKey::from_environment();
+
     // Read annotations from stdin, and index by ID.
     let mut annotations = BTreeMap::new();
     {
@@ -76,7 +78,7 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
         let contents = fs::read_to_string(&filename)?;
 
         // Add annotations into the text body and emit to out directory
-        let woven_body = weave(&filename, &contents, &annotations)?;
+        let woven_body = weave(&filename, &contents, &annotations, &symbols)?;
         let out_file = Path::new(&cfg.out_dir).join(&filename);
 
         // Create subdirectories if needed.

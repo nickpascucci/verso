@@ -4,6 +4,7 @@ use std::fs;
 use std::io;
 use std::process;
 
+use verso::SymbolKey;
 use verso::{extract_fragments, Fragment};
 
 fn main() {
@@ -50,7 +51,8 @@ pub fn run(cfg: Config) -> Result<(), Box<dyn Error>> {
     // Do the read and print in separate passes to enable clean error messages.
     for filename in cfg.filenames {
         let contents = fs::read_to_string(&filename)?;
-        let mut fragments = extract_fragments(&contents, &filename)?;
+        let symbols = SymbolKey::from_environment();
+        let mut fragments = extract_fragments(&contents, &filename, &symbols)?;
         annotations.append(&mut fragments);
     }
 

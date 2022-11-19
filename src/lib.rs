@@ -26,6 +26,47 @@ const ABS_PATH_REF: &str = "abspath";
 const REL_PATH_REF: &str = "relpath";
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct SymbolKey {
+    block_open: String,
+    block_close: String,
+
+    halt: String,
+    insertion: String,
+    pattern: String,
+    reference: String,
+}
+
+impl Default for SymbolKey {
+    fn default() -> Self {
+        Self {
+            block_open: BLOCK_OPEN_SYMBOL.to_string(),
+            block_close: BLOCK_CLOSE_SYMBOL.to_string(),
+            halt: HALT_SYMBOL.to_string(),
+            insertion: INSERTION_SYMBOL.to_string(),
+            pattern: PATTERN_SYMBOL.to_string(),
+            reference: REFERENCE_SYMBOL.to_string(),
+        }
+    }
+}
+
+impl SymbolKey {
+    pub fn from_environment() -> Self {
+        use std::env::var;
+
+        let defaults = Self::default();
+
+        Self {
+            block_open: var("VERSO_BLOCK_OPEN_SYMBOL").unwrap_or(defaults.block_open),
+            block_close: var("VERSO_BLOCK_CLOSE_SYMBOL").unwrap_or(defaults.block_close),
+            halt: var("VERSO_HALT_SYMBOL").unwrap_or(defaults.halt),
+            insertion: var("RECTO_INSERTION_SYMBOL").unwrap_or(defaults.insertion),
+            pattern: var("RECTO_PATTERN_SYMBOL").unwrap_or(defaults.pattern),
+            reference: var("RECTO_REFERENCE_SYMBOL").unwrap_or(defaults.reference),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Fragment {
     pub body: String,
     pub id: String,
@@ -111,6 +152,7 @@ impl IdSafe for char {
 pub fn extract_fragments(
     contents: &str,
     filename: &str,
+    symbols: &SymbolKey,
 ) -> Result<Vec<Fragment>, FileError<ParseError>> {
     let mut fragments: Vec<Fragment> = vec![];
 
@@ -119,7 +161,7 @@ pub fn extract_fragments(
     for (line, content) in contents.split('\n').enumerate().map(|(l, c)| (l + 1, c)) {
         match &fragment {
             None => {
-                if let Some(col) = content.find(BLOCK_CLOSE_SYMBOL) {
+                if let Some(col) = content.find(&symbols.block_close) {
                     return Err(FileError {
                         err_type: ParseError::CloseBeforeOpen,
                         filename: filename.to_owned(),
@@ -132,13 +174,13 @@ pub fn extract_fragments(
                     });
                 }
 
-                if content.contains(HALT_SYMBOL) {
+                if content.contains(&symbols.halt) {
                     break;
                 }
 
-                if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
+                if let Some(col) = content.find(&symbols.block_open) {
                     // If the line contains a start marker, begin a fragment file.
-                    match extract_id(content, col + BLOCK_OPEN_SYMBOL.len()) {
+                    match extract_id(content, col + symbols.block_open.len()) {
                         Ok(id) => {
                             fragment = Some(Fragment {
                                 body: String::new(),
@@ -180,13 +222,13 @@ pub fn extract_fragments(
 
             Some(f) => {
                 // If the line contains an end marker, end the fragment if one exists.
-                if content.contains(BLOCK_CLOSE_SYMBOL) {
+                if content.contains(&symbols.block_close) {
                     fragments.push(f.to_owned());
                     fragment = None;
                     continue;
                 }
 
-                if let Some(col) = content.find(BLOCK_OPEN_SYMBOL) {
+                if let Some(col) = content.find(&symbols.block_open) {
                     return Err(FileError {
                         err_type: ParseError::DoubleOpen,
                         filename: filename.to_owned(),
@@ -199,7 +241,7 @@ pub fn extract_fragments(
                     });
                 }
 
-                if let Some(col) = content.find(HALT_SYMBOL) {
+                if let Some(col) = content.find(&symbols.halt) {
                     return Err(FileError {
                         err_type: ParseError::HaltWhileOpen,
                         filename: filename.to_owned(),
@@ -260,12 +302,13 @@ pub fn weave(
     filename: &str,
     contents: &str,
     annotations: &BTreeMap<String, Fragment>,
+    symbols: &SymbolKey,
 ) -> Result<String, FileError<WeaveError>> {
     let mut substrings: Vec<String> = vec![];
 
     for (line_no, line) in contents.lines().enumerate().map(|(l, c)| (l + 1, c)) {
-        if line.trim_start().starts_with(INSERTION_SYMBOL) {
-            let id = extract_id(line.trim_start(), INSERTION_SYMBOL.len());
+        if line.trim_start().starts_with(&symbols.insertion) {
+            let id = extract_id(line.trim_start(), symbols.insertion.len());
             match id {
                 Ok(id) => {
                     let fragment = annotations.get(&id);
@@ -277,7 +320,7 @@ pub fn weave(
                                 err_type: WeaveError::MissingFragment(id.to_owned()),
                                 filename: filename.to_owned(),
                                 line: line_no,
-                                col: INSERTION_SYMBOL.len(),
+                                col: symbols.insertion.len(),
                                 message: Some(format!("no fragment found with identifier {}", id)),
                             })
                         }
@@ -306,8 +349,8 @@ pub fn weave(
                     })
                 }
             }
-        } else if line.trim_start().starts_with(PATTERN_SYMBOL) {
-            let re = extract_pattern(line.trim_start(), PATTERN_SYMBOL.len());
+        } else if line.trim_start().starts_with(&symbols.pattern) {
+            let re = extract_pattern(line.trim_start(), symbols.pattern.len());
             match re {
                 Ok(re) => {
                     annotations
@@ -338,8 +381,8 @@ pub fn weave(
                     })
                 }
             }
-        } else if line.contains(REFERENCE_SYMBOL) {
-            let expanded = expand_references(line, filename, line_no, annotations)?;
+        } else if line.contains(&symbols.reference) {
+            let expanded = expand_references(line, filename, line_no, annotations, symbols)?;
             substrings.push(expanded);
         } else {
             substrings.push(line.to_owned());
@@ -369,6 +412,7 @@ fn expand_references(
     filename: &str,
     line_no: usize,
     annotations: &BTreeMap<String, Fragment>,
+    symbols: &SymbolKey,
 ) -> Result<String, FileError<WeaveError>> {
     let mut pieces: Vec<String> = vec![];
 
@@ -378,7 +422,7 @@ fn expand_references(
     for (col, c) in line.chars().enumerate() {
         match &state {
             ScannerState::SearchingForRefStart => {
-                if line[col..].starts_with(REFERENCE_SYMBOL) {
+                if line[col..].starts_with(&symbols.reference) {
                     if col > start_col {
                         pieces.push(line[start_col..col].to_owned());
                     }
@@ -388,9 +432,9 @@ fn expand_references(
             }
             ScannerState::ReadingRefStart => {
                 let chars_read = col - start_col;
-                if chars_read >= REFERENCE_SYMBOL.len() {
+                if chars_read >= symbols.reference.len() {
                     state = ScannerState::ReadingId;
-                } else if c != REFERENCE_SYMBOL.chars().nth(chars_read).unwrap() {
+                } else if c != symbols.reference.chars().nth(chars_read).unwrap() {
                     return Err(FileError {
                         err_type: WeaveError::ReferenceParseError,
                         filename: filename.to_owned(),
@@ -431,6 +475,7 @@ fn expand_references(
                         line_no,
                         start_col,
                         annotations,
+                        symbols,
                     )?;
                     pieces.push(expansion);
                     start_col = col;
@@ -443,6 +488,7 @@ fn expand_references(
                         line_no,
                         start_col,
                         annotations,
+                        symbols,
                     )?;
                     pieces.push(expansion);
                     start_col = col;
@@ -465,9 +511,10 @@ fn expand_reference(
     line: usize,
     col: usize,
     annotations: &BTreeMap<String, Fragment>,
+    symbols: &SymbolKey,
 ) -> Result<String, FileError<WeaveError>> {
-    let word = word.trim_start_matches(REFERENCE_SYMBOL);
-    let col = col + REFERENCE_SYMBOL.len(); // Offset column to account for the symbol we removed.
+    let word = word.trim_start_matches(&symbols.reference);
+    let col = col + symbols.reference.len(); // Offset column to account for the symbol we removed.
     let pieces: Vec<&str> = word.split(REFERENCE_SEPARATOR).collect();
     if pieces.len() == 2 {
         let frag_id = pieces[0];
@@ -671,6 +718,7 @@ def main():
     # >@ This line ends the fragment.
     sys.exit(1) # oops",
             "test.py",
+            &SymbolKey::default(),
         );
 
         let fragments = fragments.expect("Expected no parse errors");
@@ -704,6 +752,7 @@ def main():
 # @< This begins the fragment.
 # >@ This line ends the fragment.",
             "test.py",
+            &SymbolKey::default(),
         );
 
         let fragments = fragments.expect_err("Expected a parsing error");
@@ -735,6 +784,7 @@ Fragment 1
 
 # >@ This would cause an error.",
             "test.py",
+            &SymbolKey::default(),
         );
 
         let fragments = fragments.expect("Expected a clean read");
@@ -754,6 +804,7 @@ Fragment 1
 012345 The error is at column 2.
 # >@ This line ends the fragment.",
             "test.py",
+            &SymbolKey::default(),
         );
 
         let fragments = fragments.expect_err("Expected a parsing error");
@@ -780,6 +831,7 @@ Fragment 1
 012345 The error is at column 2.
 # >@ This line ends the fragment.",
             "test.py",
+            &SymbolKey::default(),
         );
 
         let fragments = fragments.expect_err("Expected a parsing error");
@@ -819,7 +871,8 @@ Another line.";
 
         let mut annotations = BTreeMap::new();
         annotations.insert(frag.id.to_owned(), frag);
-        let result = weave("test", text, &annotations).expect("Expected weave to return Ok");
+        let result = weave("test", text, &annotations, &SymbolKey::default())
+            .expect("Expected weave to return Ok");
 
         assert_eq!(
             result,
@@ -860,7 +913,8 @@ Another line."
         let mut annotations = BTreeMap::new();
         annotations.insert(frag2.id.to_owned(), frag2);
         annotations.insert(frag1.id.to_owned(), frag1);
-        let result = weave("test", text, &annotations).expect("Expected weave to return Ok");
+        let result = weave("test", text, &annotations, &SymbolKey::default())
+            .expect("Expected weave to return Ok");
 
         assert_eq!(
             result,
@@ -880,7 +934,8 @@ Another line."
 Another line.";
 
         let annotations = BTreeMap::new();
-        weave("test", text, &annotations).expect_err("Expected weave to return an error");
+        weave("test", text, &annotations, &SymbolKey::default())
+            .expect_err("Expected weave to return an error");
     }
 
     #[test]
@@ -902,7 +957,8 @@ Another line.";
         let mut annotations = BTreeMap::new();
         annotations.insert(frag.id.to_owned(), frag);
 
-        let err = weave("test", text, &annotations).expect_err("Expected weave to return an error");
+        let err = weave("test", text, &annotations, &SymbolKey::default())
+            .expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::UnknownProperty(s),
@@ -932,7 +988,8 @@ Another line.";
 
         let annotations = BTreeMap::new();
 
-        let err = weave("test", text, &annotations).expect_err("Expected weave to return an error");
+        let err = weave("test", text, &annotations, &SymbolKey::default())
+            .expect_err("Expected weave to return an error");
         match err {
             FileError {
                 err_type: WeaveError::MissingFragment(s),
