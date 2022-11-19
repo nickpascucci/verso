@@ -23,7 +23,7 @@ fn main() {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Config {
     pub filenames: Vec<String>,
     pub out_dir: String,

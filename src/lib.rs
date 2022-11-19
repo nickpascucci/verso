@@ -25,7 +25,7 @@ const LOC_REF: &str = "loc";
 const ABS_PATH_REF: &str = "abspath";
 const REL_PATH_REF: &str = "relpath";
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Fragment {
     pub body: String,
     pub id: String,
@@ -34,7 +34,7 @@ pub struct Fragment {
     pub col: usize,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum IdExtractError {
     NoIdFound,
     ReservedCharacterUsed(char),
@@ -46,7 +46,7 @@ pub enum PatternExtractError {
     RegexConstruction(regex::Error),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseError {
     DoubleOpen,
     CloseBeforeOpen,
@@ -56,7 +56,7 @@ pub enum ParseError {
 }
 
 // @<errors
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum WeaveError {
     MissingFragment(String),
     MissingId,
@@ -67,7 +67,7 @@ pub enum WeaveError {
     UnknownProperty(String),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FileError<T: fmt::Debug> {
     err_type: T,
     filename: String,
@@ -483,8 +483,7 @@ fn expand_reference(
                 REL_PATH_REF => {
                     let from_path = std::path::Path::new(filename);
                     let to_path = std::path::Path::new(&f.file);
-                    let rel_path =
-                        find_relative_path(&from_path.to_path_buf(), &to_path.to_path_buf());
+                    let rel_path = find_relative_path(from_path, to_path);
                     Ok(rel_path.to_string_lossy().to_string())
                 }
                 _ => Err(FileError {
