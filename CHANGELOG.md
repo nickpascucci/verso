@@ -1,9 +1,9 @@
 # Changelog
 
-Notable changes to the Optimizer are tracked in this file.
+Notable changes to verso|recto are tracked in this file.
 
 The format is based on the [Keep A Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/) spec.
-Releases may be found on [GitHub](https://github.com/nsat/optimizer/releases/) and are tagged with
+Releases may be found on [GitHub](https://github.com/nickpascucci/verso/releases/) and are tagged with
 their release number in the Git repository. Release numbers follow the [Semantic Versioning
 2.0.0](https://semver.org/) format. As a reminder, this format uses major, minor, and patch numbers
 with the following form:
