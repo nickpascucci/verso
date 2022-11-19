@@ -118,6 +118,21 @@ until it has successfully extracted annotations from all of the source files it 
 `recto` will not start weaving files together until it receives those annotations. Because of this
 if `verso` fails, `recto` will also fail.
 
+### Full symbology
+
+For reference, here is a table with the full symbology. Note that in the (hopefully rare) case that
+your language has symbols which collide with the defaults used by `verso|recto`, you can override
+them by using the listed environment variables.
+
+| Name           | Default Symbol | Description                      | Environment Variable       |
+| -------------- | -------------- | -------------------------------- | -------------------------- |
+| Block Open     | `@<`           | Starts a named fragment.         | `VERSO_BLOCK_OPEN_SYMBOL`  |
+| Block Close    | `>@`           | Ends a named fragment.           | `VERSO_BLOCK_CLOSE_SYMBOL` |
+| Halt           | `@!halt`       | Halts fragment extraction.       | `VERSO_HALT_SYMBOL`        |
+| Insert         | `@@`           | Insert a fragment by ID.         | `RECTO_INSERTION_SYMBOL`   |
+| Insert Pattern | `@*`           | Insert a fragment by ID pattern. | `RECTO_PATTERN_SYMBOL`     |
+| Reference      | `@?`           | Insert fragment metadata.        | `RECTO_REFERENCE_SYMBOL`   |
+
 ## The Name
 
 > Recto and verso are respectively, the text written or printed on the "right" or "front" side and
