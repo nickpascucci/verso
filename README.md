@@ -61,44 +61,45 @@ borrows:
 ## Using `verso|recto`
 
 `verso|recto` is driven by annotations within your source files, defining regions which can be
-referenced by other documents.
+referenced by other documents. These regions are called "fragments".
 
 ### Annotating a file
 
-Annotations are quite simple. To mark a region of code for reference, simply add a pair of comments
-around the region with the symbols `@<` and `>@`, followed by a unique ID. The ID can be any string
-of alphanumeric characters and the characters `/`, `_`, or `-`, though it should be both unique
-within your project and valid in the source file you're annotating. The period character (`.`) is
-reserved, as it is used for references. Other characters may be added in the future. If a character
-you want to use is not listed here, please file an issue on GitHub (or better yet, send a PR)!
+Annotations are quite simple. To mark a region of code and make a fragment, simply add a pair of
+comments around the region with the symbols `@<` and `>@` followed by a unique ID. The ID can be any
+string of alphanumeric characters and the characters `/`, `_`, or `-`, though it should be both
+unique within your project and valid in the source file you're annotating. (The period character
+(`.`) is reserved, as it is used for inserting metadata about fragments.) Other characters may be
+added to the "safe" list in the future. If a character you want to use is not listed here, please
+file an issue on GitHub (or better yet, send a PR)!
 
 ### Referencing annotations
 
-In order to reference an annotation in another file, add a line containing the symbol `@@` followed
-by the ID of the annotation (e.g. `@@12345`). When the file is woven using the `recto` command (see
-the next section), the line will be replaced with the contents of the annotation. You can add any
-markup you like around the line to provide formatting.
+In order to insert a fragment in another file, add a line containing the symbol `@@` followed by the
+ID of the annotation (e.g. `@@12345`). When the file is woven using the `recto` command (see the
+next section), the line will be replaced with the contents of th fragment. You can add any markup
+you like around the line to provide formatting.
 
-To reference a group of fragments, a regular expression can be used after the `@*` symbol. All of
-the fragments whose ID matches the expression will be inserted in place of the symbol, in
-lexicographic order by their IDs.
+To insert a group of fragments, a regular expression can be used after the `@*` symbol. All of the
+fragments whose ID matches the expression will be inserted in place of the symbol, in lexicographic
+order by their IDs.
 
-Sometimes it is also desirable to refer to metadata about an annotation. Currently, `verso|recto`
+Sometimes it is also desirable to refer to metadata about a fragment. Currently, `verso|recto`
 supports the following metadata insertion operators:
 
-1. _Filename._ `@?id.file` inserts the name of the file the annotation was drawn from.
-2. _Line number._ `@?id.line` inserts the line number on which the annotation began.
-3. _Column number._ `@?id.col` inserts the column number at which the annotation began. (Currently
-   this value is always 0, as annotations always begin at the start of a line.)
+1. _Filename._ `@?id.file` inserts the name of the file the fragment was drawn from.
+2. _Line number._ `@?id.line` inserts the line number on which the fragment began.
+3. _Column number._ `@?id.col` inserts the column number at which the fragment began. (Currently
+   this value is always 0, as fragments always begin at the start of a line.)
 4. _Quick location._ `@?id.loc` inserts the file name, starting line number, and column number for
-   the annotation in the format `file (line:col)`. This is useful if you just want to quickly refer
-   to the metadata without futzing with the formatting.
+   the fragment in the format `file (line:col)`. This is useful if you just want to quickly refer to
+   the metadata without futzing with the formatting.
 
 ### Weaving a document for human consumption
 
-The `verso` command will read all of the annotations from the files specified on the command line,
-extract their annotations, and output the result to stdout. In turn the `recto` command will read
-its annotations from stdin. This makes the two programs easy to use together via pipes:
+The `verso` command will read all of the files specified on the command line, extract their
+fragments, and output the result to stdout. In turn the `recto` command will read fragments from
+stdin. This makes the two programs easy to use together via pipes:
 
 ```
 verso main.rs lib.rs | recto build chap1.tex chap2.tex blog/home.md
@@ -114,9 +115,9 @@ same relative location as given on the command line. So, for example, the file `
 will be written to `build/blog/home.md` when it is woven.
 
 Note that, although the two programs appear to run in parallel, `verso` won't send input to `recto`
-until it has successfully extracted annotations from all of the source files it was given and that
-`recto` will not start weaving files together until it receives those annotations. Because of this
-if `verso` fails, `recto` will also fail.
+until it has successfully extracted fragments from all of the source files it was given and that
+`recto` will not start weaving files together until it receives those fragments. Because of this if
+`verso` fails, `recto` will also fail.
 
 ### Full symbology
 
@@ -124,14 +125,14 @@ For reference, here is a table with the full symbology. Note that in the (hopefu
 your language has symbols which collide with the defaults used by `verso|recto`, you can override
 them by using the listed environment variables.
 
-| Name           | Default Symbol | Description                      | Environment Variable       |
-| -------------- | -------------- | -------------------------------- | -------------------------- |
-| Block Open     | `@<`           | Starts a named fragment.         | `VERSO_BLOCK_OPEN_SYMBOL`  |
-| Block Close    | `>@`           | Ends a named fragment.           | `VERSO_BLOCK_CLOSE_SYMBOL` |
-| Halt           | `@!halt`       | Halts fragment extraction.       | `VERSO_HALT_SYMBOL`        |
-| Insert         | `@@`           | Insert a fragment by ID.         | `RECTO_INSERTION_SYMBOL`   |
-| Insert Pattern | `@*`           | Insert a fragment by ID pattern. | `RECTO_PATTERN_SYMBOL`     |
-| Reference      | `@?`           | Insert fragment metadata.        | `RECTO_REFERENCE_SYMBOL`   |
+| Name            | Symbol   | Description                       | Override Variable             |
+| --------------- | -------- | --------------------------------- | ----------------------------- |
+| Fragment Open   | `@<`     | Starts a named fragment.          | `VERSO_FRAGMENT_OPEN_SYMBOL`  |
+| Fragment Close  | `>@`     | Ends a named fragment.            | `VERSO_FRAGMENT_CLOSE_SYMBOL` |
+| Halt            | `@!halt` | Halts fragment extraction.        | `VERSO_HALT_SYMBOL`           |
+| Insert Fragment | `@@`     | Insert a fragment by ID.          | `RECTO_INSERTION_SYMBOL`      |
+| Insert Pattern  | `@*`     | Insert a fragment by ID pattern.  | `RECTO_PATTERN_SYMBOL`        |
+| Insert Metadata | `@?`     | Insert metadata about a fragment. | `RECTO_METADATA_SYMBOL`       |
 
 ## The Name
 
@@ -151,7 +152,7 @@ the right.)_
 
 ## Future Work
 
-- Add support for allow overlapping annotations.
+- Add support for allow overlapping fragments.
 - Add support for custom formatting of annotation properties within the woven output.
 - Paralellize file processing in Verso, and both reading from `stdin` and file reading in Recto.
-- Add `--annotations-from` option to specify a source other than stdin for annotations.
+- Add `--fragments-from` option to specify a source other than stdin for fragments.

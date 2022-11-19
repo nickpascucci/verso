@@ -5,18 +5,18 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
-// These are built using compile-time macros so that verso does not see them as starting a block in
-// this file.
-const BLOCK_OPEN_SYMBOL: &str = concat!("@", "<");
-const BLOCK_CLOSE_SYMBOL: &str = concat!(">", "@");
+// These are built using compile-time macros so that verso does not see them as starting a fragment
+// in this file.
+const FRAGMENT_OPEN_SYMBOL: &str = concat!("@", "<");
+const FRAGMENT_CLOSE_SYMBOL: &str = concat!(">", "@");
 
 const ID_SAFE_CHARS: &[char] = &['/', '_', '-'];
 
 const HALT_SYMBOL: &str = "@!halt";
 const INSERTION_SYMBOL: &str = "@@";
 const PATTERN_SYMBOL: &str = "@*";
-const REFERENCE_SYMBOL: &str = "@?";
-const REFERENCE_SEPARATOR: char = '.';
+const METADATA_SYMBOL: &str = "@?";
+const METADATA_SEPARATOR: char = '.';
 
 const FILENAME_REF: &str = "file";
 const LINE_NO_REF: &str = "line";
@@ -27,24 +27,24 @@ const REL_PATH_REF: &str = "relpath";
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct SymbolKey {
-    block_open: String,
-    block_close: String,
+    fragment_open: String,
+    fragment_close: String,
 
     halt: String,
     insertion: String,
     pattern: String,
-    reference: String,
+    metadata: String,
 }
 
 impl Default for SymbolKey {
     fn default() -> Self {
         Self {
-            block_open: BLOCK_OPEN_SYMBOL.to_string(),
-            block_close: BLOCK_CLOSE_SYMBOL.to_string(),
+            fragment_open: FRAGMENT_OPEN_SYMBOL.to_string(),
+            fragment_close: FRAGMENT_CLOSE_SYMBOL.to_string(),
             halt: HALT_SYMBOL.to_string(),
             insertion: INSERTION_SYMBOL.to_string(),
             pattern: PATTERN_SYMBOL.to_string(),
-            reference: REFERENCE_SYMBOL.to_string(),
+            metadata: METADATA_SYMBOL.to_string(),
         }
     }
 }
@@ -56,12 +56,12 @@ impl SymbolKey {
         let defaults = Self::default();
 
         Self {
-            block_open: var("VERSO_BLOCK_OPEN_SYMBOL").unwrap_or(defaults.block_open),
-            block_close: var("VERSO_BLOCK_CLOSE_SYMBOL").unwrap_or(defaults.block_close),
+            fragment_open: var("VERSO_FRAGMENT_OPEN_SYMBOL").unwrap_or(defaults.fragment_open),
+            fragment_close: var("VERSO_FRAGMENT_CLOSE_SYMBOL").unwrap_or(defaults.fragment_close),
             halt: var("VERSO_HALT_SYMBOL").unwrap_or(defaults.halt),
             insertion: var("RECTO_INSERTION_SYMBOL").unwrap_or(defaults.insertion),
             pattern: var("RECTO_PATTERN_SYMBOL").unwrap_or(defaults.pattern),
-            reference: var("RECTO_REFERENCE_SYMBOL").unwrap_or(defaults.reference),
+            metadata: var("RECTO_METADATA_SYMBOL").unwrap_or(defaults.metadata),
         }
     }
 }
@@ -103,8 +103,8 @@ pub enum WeaveError {
     MissingId,
     IdExtractError,
     PatternExtractError,
-    ReferenceParseError,
-    BadReference(String),
+    MetadataParseError,
+    BadMetadata(String),
     UnknownProperty(String),
 }
 
@@ -161,14 +161,14 @@ pub fn extract_fragments(
     for (line, content) in contents.split('\n').enumerate().map(|(l, c)| (l + 1, c)) {
         match &fragment {
             None => {
-                if let Some(col) = content.find(&symbols.block_close) {
+                if let Some(col) = content.find(&symbols.fragment_close) {
                     return Err(FileError {
                         err_type: ParseError::CloseBeforeOpen,
                         filename: filename.to_owned(),
                         line,
                         col,
                         message: Some(format!(
-                            "found a block close symbol when no block is active: {}",
+                            "found a fragment close symbol when no fragment is active: {}",
                             line
                         )),
                     });
@@ -178,14 +178,14 @@ pub fn extract_fragments(
                     break;
                 }
 
-                if let Some(col) = content.find(&symbols.block_open) {
+                if let Some(col) = content.find(&symbols.fragment_open) {
                     // If the line contains a start marker, begin a fragment file.
-                    match extract_id(content, col + symbols.block_open.len()) {
+                    match extract_id(content, col + symbols.fragment_open.len()) {
                         Ok(id) => {
                             fragment = Some(Fragment {
                                 body: String::new(),
                                 id,
-                                // The fragment to extract starts at the beginning of the next line.
+                                // The fragment to extract starts at the beginning of the next line
                                 line: line + 1,
                                 col: 0,
                                 file: filename.to_owned(),
@@ -198,7 +198,7 @@ pub fn extract_fragments(
                                 line,
                                 col,
                                 message: Some(format!(
-                                    "no fragment identifier found in block open symbol: {}",
+                                    "no fragment identifier found in fragment open symbol: {}",
                                     line
                                 )),
                             });
@@ -210,7 +210,7 @@ pub fn extract_fragments(
                                 line,
                                 col,
                                 message: Some(format!(
-                                    "error parsing fragment identifier in block open symbol: {}
+                                    "error parsing fragment identifier in fragment open symbol: {}
                                      (used reserved character {})",
                                     line, c
                                 )),
@@ -222,20 +222,20 @@ pub fn extract_fragments(
 
             Some(f) => {
                 // If the line contains an end marker, end the fragment if one exists.
-                if content.contains(&symbols.block_close) {
+                if content.contains(&symbols.fragment_close) {
                     fragments.push(f.to_owned());
                     fragment = None;
                     continue;
                 }
 
-                if let Some(col) = content.find(&symbols.block_open) {
+                if let Some(col) = content.find(&symbols.fragment_open) {
                     return Err(FileError {
                         err_type: ParseError::DoubleOpen,
                         filename: filename.to_owned(),
                         line,
                         col,
                         message: Some(format!(
-                            "found a block open symbol while a block is already opened: {}",
+                            "found a fragment open symbol while a fragment is already opened: {}",
                             line
                         )),
                     });
@@ -248,7 +248,7 @@ pub fn extract_fragments(
                         line,
                         col,
                         message: Some(format!(
-                            "halt symbol found while a block was open: {}",
+                            "halt symbol found while a fragment was open: {}",
                             line
                         )),
                     });
@@ -342,7 +342,7 @@ pub fn weave(
                         line: line_no,
                         col: 0,
                         message: Some(format!(
-                            "error parsing fragment identifier in block open symbol: {}
+                            "error parsing identifier in fragment open symbol: {}
                              (used reserved character {})",
                             line, c
                         )),
@@ -374,15 +374,15 @@ pub fn weave(
                         line: line_no,
                         col: 0,
                         message: Some(format!(
-                            "error parsing fragment pattern in block open symbol: {}
+                            "error parsing pattern at insertion symbol: {}
                              (regex construction failed with {})",
                             line, e
                         )),
                     })
                 }
             }
-        } else if line.contains(&symbols.reference) {
-            let expanded = expand_references(line, filename, line_no, annotations, symbols)?;
+        } else if line.contains(&symbols.metadata) {
+            let expanded = expand_metadata_refs(line, filename, line_no, annotations, symbols)?;
             substrings.push(expanded);
         } else {
             substrings.push(line.to_owned());
@@ -402,12 +402,12 @@ pub fn weave(
 #[derive(Debug, PartialEq, Clone)]
 enum ScannerState {
     SearchingForRefStart,
-    ReadingRefStart,
+    ReadingMetaStart,
     ReadingId,
     ReadingRefType,
 }
 
-fn expand_references(
+fn expand_metadata_refs(
     line: &str,
     filename: &str,
     line_no: usize,
@@ -422,26 +422,26 @@ fn expand_references(
     for (col, c) in line.chars().enumerate() {
         match &state {
             ScannerState::SearchingForRefStart => {
-                if line[col..].starts_with(&symbols.reference) {
+                if line[col..].starts_with(&symbols.metadata) {
                     if col > start_col {
                         pieces.push(line[start_col..col].to_owned());
                     }
                     start_col = col;
-                    state = ScannerState::ReadingRefStart;
+                    state = ScannerState::ReadingMetaStart;
                 }
             }
-            ScannerState::ReadingRefStart => {
+            ScannerState::ReadingMetaStart => {
                 let chars_read = col - start_col;
-                if chars_read >= symbols.reference.len() {
+                if chars_read >= symbols.metadata.len() {
                     state = ScannerState::ReadingId;
-                } else if c != symbols.reference.chars().nth(chars_read).unwrap() {
+                } else if c != symbols.metadata.chars().nth(chars_read).unwrap() {
                     return Err(FileError {
-                        err_type: WeaveError::ReferenceParseError,
+                        err_type: WeaveError::MetadataParseError,
                         filename: filename.to_owned(),
                         line: line_no,
                         col,
                         message: Some(format!(
-                            "unexpected character '{}' while reading reference symbol in line {}",
+                            "unexpected character '{}' while reading metadata symbol in line {}",
                             c, line
                         )),
                     });
@@ -449,17 +449,17 @@ fn expand_references(
             }
             ScannerState::ReadingId => {
                 if !c.is_safe_for_ids() {
-                    if c == REFERENCE_SEPARATOR {
+                    if c == METADATA_SEPARATOR {
                         state = ScannerState::ReadingRefType;
                     } else {
                         return Err(FileError {
-                            err_type: WeaveError::ReferenceParseError,
+                            err_type: WeaveError::MetadataParseError,
                             filename: filename.to_owned(),
                             line: line_no,
                             col,
                             message: Some(format!(
-                                "expected '{}', got '{}' while reading reference symbol in line {}",
-                                REFERENCE_SEPARATOR, c, line
+                                "expected '{}', got '{}' while reading metadata symbol in line {}",
+                                METADATA_SEPARATOR, c, line
                             )),
                         });
                     };
@@ -469,7 +469,7 @@ fn expand_references(
                 // TODO Clean up this code a little, to reduce duplication.
                 if !c.is_safe_for_refs() {
                     state = ScannerState::SearchingForRefStart;
-                    let expansion = expand_reference(
+                    let expansion = expand_metadata(
                         &line[start_col..col],
                         filename,
                         line_no,
@@ -481,8 +481,8 @@ fn expand_references(
                     start_col = col;
                 } else if col == line.len() - 1 {
                     state = ScannerState::SearchingForRefStart;
-                    let col = col + 1; // NOTE This differs from the block above.
-                    let expansion = expand_reference(
+                    let col = col + 1; // NOTE This differs from the fragment above.
+                    let expansion = expand_metadata(
                         &line[start_col..col],
                         filename,
                         line_no,
@@ -505,7 +505,7 @@ fn expand_references(
     Ok(pieces.join(""))
 }
 
-fn expand_reference(
+fn expand_metadata(
     word: &str,
     filename: &str,
     line: usize,
@@ -513,9 +513,9 @@ fn expand_reference(
     annotations: &BTreeMap<String, Fragment>,
     symbols: &SymbolKey,
 ) -> Result<String, FileError<WeaveError>> {
-    let word = word.trim_start_matches(&symbols.reference);
-    let col = col + symbols.reference.len(); // Offset column to account for the symbol we removed.
-    let pieces: Vec<&str> = word.split(REFERENCE_SEPARATOR).collect();
+    let word = word.trim_start_matches(&symbols.metadata);
+    let col = col + symbols.metadata.len(); // Offset column to account for the symbol we removed.
+    let pieces: Vec<&str> = word.split(METADATA_SEPARATOR).collect();
     if pieces.len() == 2 {
         let frag_id = pieces[0];
         let prop = pieces[1];
@@ -538,7 +538,7 @@ fn expand_reference(
                     filename: filename.to_owned(),
                     line,
                     col: col + frag_id.len() + 1,
-                    message: Some(format!("unknown reference type '{}'", prop)),
+                    message: Some(format!("unknown metadata type '{}'", prop)),
                 }),
             },
             None => Err(FileError {
@@ -552,7 +552,7 @@ fn expand_reference(
     } else {
         // TODO Make these errors more granular.
         Err(FileError {
-            err_type: WeaveError::BadReference(word.to_owned()),
+            err_type: WeaveError::BadMetadata(word.to_owned()),
             filename: filename.to_owned(),
             line,
             col,
@@ -651,7 +651,7 @@ mod tests {
     #[test]
     fn test_extract_id_reserved_chars() {
         let id_elements = ["foo", "bar", "baz", "quuz"];
-        let id_reserved_chars = &[REFERENCE_SEPARATOR];
+        let id_reserved_chars = &[METADATA_SEPARATOR];
         for sep in id_reserved_chars {
             let input = &id_elements.join(&sep.to_string());
             let id = extract_id(input, 0);
@@ -939,7 +939,7 @@ Another line.";
     }
 
     #[test]
-    fn test_weave_bad_reference_type() {
+    fn test_weave_bad_metadata_type() {
         let text = "This is the first line!
 
 @?1.foo
@@ -979,7 +979,7 @@ Another line.";
     }
 
     #[test]
-    fn test_weave_bad_reference_id() {
+    fn test_weave_bad_metadata_id() {
         let text = "This is the first line!
 
 @?1.loc
