@@ -45,6 +45,13 @@ updated throughout the repository.
 
 - A new weave pattern, `@* <regex>`, can be used which expands to all of the fragments whose IDs
   match the given regular expression.
+- Users can now set their own symbols for fragment boundaries, insertion, and so on using
+  environment variables. 
+
+### Changed
+
+- Various discrepancies in terminology between the README and source code have been cleaned up.
+- Both `verso` and `recto` now print a more helpful error message if argument parsing fails.
 
 ## v0.1.2
 
