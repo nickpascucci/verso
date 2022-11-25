@@ -1,7 +1,7 @@
 # verso|recto - A Different Approach to Literate Programming
 
 [![CI Status](https://github.com/nickpascucci/verso/workflows/Rust/badge.svg)](https://github.com/nickpascucci/verso/actions)
-[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.0-orange.svg?longCache=true)](https://crates.io/crates/verso)
+[![Crates.io](https://img.shields.io/crates/v/verso)](https://crates.io/crates/verso)
 
 > Literate programming is the art of preparing programs for human readers.
 
