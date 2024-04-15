@@ -73,6 +73,8 @@ unique within your project and valid in the source file you're annotating. (The 
 added to the "safe" list in the future. If a character you want to use is not listed here, please
 file an issue on GitHub (or better yet, send a PR)!
 
+Fragments can also be nested. This is particularly useful when you want to annotate a region of a source file that is already contained within a larger "outer" fragment. The annotations for the "inner" fragment will not appear in the output. This is best illustrated with an example. See the following [source](./examples/test/nested.rs), [prose](./examples/test/nested.md) and [output](./examples/reference/test/nested.md) files.
+
 ### Referencing annotations
 
 In order to insert a fragment in another file, add a line containing the symbol `@@` followed by the
@@ -149,10 +151,10 @@ the right.)_
 
 - [@nickpascucci](https://github.com/nickpascucci/)
 - [@karlicoss](https://github.com/karlicoss/)
+- [@elidhu](https://github.com/elidhu/)
 
 ## Future Work
 
-- Add support for allow overlapping fragments.
 - Add support for custom formatting of annotation properties within the woven output.
 - Paralellize file processing in Verso, and both reading from `stdin` and file reading in Recto.
 - Add `--fragments-from` option to specify a source other than stdin for fragments.
