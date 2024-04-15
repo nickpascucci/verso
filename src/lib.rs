@@ -89,7 +89,7 @@ pub enum PatternExtractError {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseError {
-    DoubleOpen,
+    UnclosedFragment,
     CloseBeforeOpen,
     MissingId,
     IdExtractError,
@@ -247,7 +247,7 @@ pub fn extract_fragments(
 
     if !fragment_stack.is_empty() {
         return Err(FileError {
-            err_type: ParseError::DoubleOpen,
+            err_type: ParseError::UnclosedFragment,
             filename: filename.to_owned(),
             line: contents.lines().count(),
             col: 0,
@@ -750,32 +750,37 @@ def main():
 
         let fragments = fragments.expect("Expected no parse errors");
         assert!(
-            fragments.len() == 3,
+            fragments.len() == 3, // Two fragments in addition to the full file
             "Expected two fragments, found {}",
             fragments.len()
         );
-        assert_eq!(fragments[0].body, "",);
+        // Innermost, empty fragment
+        assert_eq!(fragments[0].body, "", "Expected fragment to be empty");
         assert!(
             fragments[0].id == *"quux",
             "Unexpected ID {:?}",
             fragments[0].id
         );
+        // Middle fragment, that has content, including all child fragments with tags removed.
         assert_eq!(
             fragments[1].body,
             "        Start of inner
         End of inner",
+            "Expected nested fragment markers to be removed"
         );
         assert!(
             fragments[1].id == *"qux",
             "Unexpected ID {:?}",
             fragments[1].id
         );
+        // Outer fragment, that has content, including all child fragments with tags removed.
         assert_eq!(
             fragments[2].body,
             "    Start of outer
         Start of inner
         End of inner
     End of outer",
+            "Expected nested fragment markers to be removed"
         );
         assert!(
             fragments[2].id == *"foobarbaz",
