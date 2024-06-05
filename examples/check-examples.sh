@@ -4,8 +4,8 @@ set -e
 
 DIFF=$(which colordiff || echo "diff")
 
-SOURCE_FILES="example.py test/example-2.py"
-PROSE_FILES="empty.md example.md test/example-2.md test/level-2/l2.md"
+SOURCE_FILES="example.py test/example-2.py test/nested.rs"
+PROSE_FILES="empty.md example.md test/example-2.md test/level-2/l2.md test/nested.md"
 OUTPUT_DIRECTORY=out
 
 cd "$(dirname "$0")/.."

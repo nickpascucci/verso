@@ -89,7 +89,7 @@ pub enum PatternExtractError {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseError {
-    DoubleOpen,
+    UnclosedFragment,
     CloseBeforeOpen,
     MissingId,
     IdExtractError,
@@ -155,116 +155,104 @@ pub fn extract_fragments(
     symbols: &SymbolKey,
 ) -> Result<Vec<Fragment>, FileError<ParseError>> {
     let mut fragments: Vec<Fragment> = vec![];
-
-    let mut fragment: Option<Fragment> = None;
+    let mut fragment_stack: Vec<Fragment> = vec![];
 
     for (line, content) in contents.split('\n').enumerate().map(|(l, c)| (l + 1, c)) {
-        match &fragment {
-            None => {
-                if let Some(col) = content.find(&symbols.fragment_close) {
+        if let Some(col) = content.find(&symbols.fragment_open) {
+            match extract_id(content, col + symbols.fragment_open.len()) {
+                Ok(id) => {
+                    // Push a new Fragment onto the stack.
+                    fragment_stack.push(Fragment {
+                        body: String::new(),
+                        id,
+                        file: filename.to_owned(),
+                        // The Fragment starts on the line after the opening symbol.
+                        line: line + 1,
+                        col: 0,
+                    });
+                }
+                Err(IdExtractError::NoIdFound) => {
                     return Err(FileError {
-                        err_type: ParseError::CloseBeforeOpen,
+                        err_type: ParseError::MissingId,
                         filename: filename.to_owned(),
                         line,
                         col,
                         message: Some(format!(
-                            "found a fragment close symbol when no fragment is active: {}",
+                            "no fragment identifier found in fragment open symbol: {}",
                             line
                         )),
                     });
                 }
-
-                if content.contains(&symbols.halt) {
-                    break;
-                }
-
-                if let Some(col) = content.find(&symbols.fragment_open) {
-                    // If the line contains a start marker, begin a fragment file.
-                    match extract_id(content, col + symbols.fragment_open.len()) {
-                        Ok(id) => {
-                            fragment = Some(Fragment {
-                                body: String::new(),
-                                id,
-                                // The fragment to extract starts at the beginning of the next line
-                                line: line + 1,
-                                col: 0,
-                                file: filename.to_owned(),
-                            });
-                        }
-                        Err(IdExtractError::NoIdFound) => {
-                            return Err(FileError {
-                                err_type: ParseError::MissingId,
-                                filename: filename.to_owned(),
-                                line,
-                                col,
-                                message: Some(format!(
-                                    "no fragment identifier found in fragment open symbol: {}",
-                                    line
-                                )),
-                            });
-                        }
-                        Err(IdExtractError::ReservedCharacterUsed(c)) => {
-                            return Err(FileError {
-                                err_type: ParseError::IdExtractError,
-                                filename: filename.to_owned(),
-                                line,
-                                col,
-                                message: Some(format!(
-                                    "error parsing fragment identifier in fragment open symbol: {}
+                Err(IdExtractError::ReservedCharacterUsed(c)) => {
+                    return Err(FileError {
+                        err_type: ParseError::IdExtractError,
+                        filename: filename.to_owned(),
+                        line,
+                        col,
+                        message: Some(format!(
+                            "error parsing fragment identifier in fragment open symbol: {}
                                      (used reserved character {})",
-                                    line, c
-                                )),
-                            });
-                        }
+                            line, c
+                        )),
+                    });
+                }
+            }
+        } else if let Some(col) = content.find(&symbols.fragment_close) {
+            if let Some(closed_fragment) = fragment_stack.pop() {
+                let trimmed_body = closed_fragment.body.trim_end_matches('\n').to_string();
+                if let Some(parent_fragment) = fragment_stack.last_mut() {
+                    // Special handling of "empty" fragments.
+                    if !trimmed_body.is_empty() {
+                        // Add the child fragments body to the parent fragment.
+                        parent_fragment.body.push_str(&trimmed_body);
+                        parent_fragment.body.push('\n');
                     }
                 }
-            }
-
-            Some(f) => {
-                // If the line contains an end marker, end the fragment if one exists.
-                if content.contains(&symbols.fragment_close) {
-                    fragments.push(f.to_owned());
-                    fragment = None;
-                    continue;
-                }
-
-                if let Some(col) = content.find(&symbols.fragment_open) {
-                    return Err(FileError {
-                        err_type: ParseError::DoubleOpen,
-                        filename: filename.to_owned(),
-                        line,
-                        col,
-                        message: Some(format!(
-                            "found a fragment open symbol while a fragment is already opened: {}",
-                            line
-                        )),
-                    });
-                }
-
-                if let Some(col) = content.find(&symbols.halt) {
-                    return Err(FileError {
-                        err_type: ParseError::HaltWhileOpen,
-                        filename: filename.to_owned(),
-                        line,
-                        col,
-                        message: Some(format!(
-                            "halt symbol found while a fragment was open: {}",
-                            line
-                        )),
-                    });
-                }
-
-                // If there no markers, append the line to the existing fragment.
-                fragment = fragment.map(|x| Fragment {
-                    body: if x.body.is_empty() {
-                        content.to_string()
-                    } else {
-                        x.body + "\n" + content
-                    },
-                    ..x
+                // Add the closed fragment to the results list
+                fragments.push(Fragment {
+                    body: trimmed_body,
+                    ..closed_fragment
+                });
+            } else {
+                return Err(FileError {
+                    err_type: ParseError::CloseBeforeOpen,
+                    filename: filename.to_owned(),
+                    line,
+                    col,
+                    message: Some("fragment close symbol found without an open symbol".to_string()),
                 });
             }
+        } else if let Some(col) = content.find(&symbols.halt) {
+            // If the Fragment stack is not empty, we have an error as there is at least 1 open
+            // Fragment.
+            if !fragment_stack.is_empty() {
+                return Err(FileError {
+                    err_type: ParseError::HaltWhileOpen,
+                    filename: filename.to_owned(),
+                    line,
+                    col,
+                    message: Some(format!(
+                        "halt symbol found while a fragment was open: {}",
+                        line
+                    )),
+                });
+            }
+            // Otherwise stop processing and break out.
+            break;
+        } else if let Some(fragment) = fragment_stack.last_mut() {
+            fragment.body.push_str(content);
+            fragment.body.push('\n');
         }
+    }
+
+    if !fragment_stack.is_empty() {
+        return Err(FileError {
+            err_type: ParseError::UnclosedFragment,
+            filename: filename.to_owned(),
+            line: contents.lines().count(),
+            col: 0,
+            message: Some("not all fragments were closed".to_string()),
+        });
     }
 
     Ok(fragments)
@@ -743,6 +731,65 @@ def main():
     }
 
     #[test]
+    fn test_extract_fragments_nested() {
+        let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
+            "# This is an example.
+    # @<foobarbaz This begins the fragment.
+    Start of outer
+    # @<qux
+        Start of inner
+            # @<quux
+            # >@
+        End of inner
+    # >@
+    End of outer
+    # >@",
+            "test.py",
+            &SymbolKey::default(),
+        );
+
+        let fragments = fragments.expect("Expected no parse errors");
+        assert!(
+            fragments.len() == 3, // Two fragments in addition to the full file
+            "Expected two fragments, found {}",
+            fragments.len()
+        );
+        // Innermost, empty fragment
+        assert_eq!(fragments[0].body, "", "Expected fragment to be empty");
+        assert!(
+            fragments[0].id == *"quux",
+            "Unexpected ID {:?}",
+            fragments[0].id
+        );
+        // Middle fragment, that has content, including all child fragments with tags removed.
+        assert_eq!(
+            fragments[1].body,
+            "        Start of inner
+        End of inner",
+            "Expected nested fragment markers to be removed"
+        );
+        assert!(
+            fragments[1].id == *"qux",
+            "Unexpected ID {:?}",
+            fragments[1].id
+        );
+        // Outer fragment, that has content, including all child fragments with tags removed.
+        assert_eq!(
+            fragments[2].body,
+            "    Start of outer
+        Start of inner
+        End of inner
+    End of outer",
+            "Expected nested fragment markers to be removed"
+        );
+        assert!(
+            fragments[2].id == *"foobarbaz",
+            "Unexpected ID {:?}",
+            fragments[2].id
+        );
+    }
+
+    #[test]
     fn test_extract_fragments_close_before_open() {
         let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
@@ -796,13 +843,13 @@ Fragment 1
     }
 
     #[test]
-    fn test_extract_fragments_double_open() {
+    fn test_extract_fragments_halt_while_open() {
         let fragments: Result<Vec<Fragment>, FileError<ParseError>> = extract_fragments(
             "# This is an example.
-# @<foobarbaz This begins the fragment.
-# @< This is an error on line 3.
-012345 The error is at column 2.
-# >@ This line ends the fragment.",
+# @<1
+Fragment 1
+# @!halt This line causes an error as we have an open Fragment.
+# >@",
             "test.py",
             &SymbolKey::default(),
         );
@@ -810,15 +857,15 @@ Fragment 1
         let fragments = fragments.expect_err("Expected a parsing error");
         match fragments {
             FileError {
-                err_type: ParseError::DoubleOpen,
+                err_type: ParseError::HaltWhileOpen,
                 line,
                 col,
                 ..
             } => {
-                assert_eq!(line, 3, "Expected error on line 3, found line {:?}", line);
+                assert_eq!(line, 4, "Expected error on line 4, found line {:?}", line);
                 assert_eq!(col, 2, "Expected error on col 2, found col {:?}", col);
             }
-            _ => panic!("Expected ParseError::DoubleOpen, got {:?}", fragments),
+            _ => panic!("Expected ParseError::HaltWhileOpen, got {:?}", fragments),
         }
     }
 
