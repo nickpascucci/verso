@@ -41,6 +41,12 @@ updated throughout the repository.
 
 ## [Unreleased]
 
+## v0.3.0
+
+### Added
+
+- `verso` now supports extracting nested fragments.
+
 ## v0.2.0
 
 ### Added

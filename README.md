@@ -73,7 +73,11 @@ unique within your project and valid in the source file you're annotating. (The 
 added to the "safe" list in the future. If a character you want to use is not listed here, please
 file an issue on GitHub (or better yet, send a PR)!
 
-Fragments can also be nested. This is particularly useful when you want to annotate a region of a source file that is already contained within a larger "outer" fragment. The annotations for the "inner" fragment will not appear in the output. This is best illustrated with an example. See the following [source](./examples/test/nested.rs), [prose](./examples/test/nested.md) and [output](./examples/reference/test/nested.md) files.
+Fragments can also be nested. This is particularly useful when you want to annotate a region of a
+source file that is already contained within a larger "outer" fragment. The annotations for the
+"inner" fragment will not appear in the output. This is best illustrated with an example; see the
+following [source](./examples/test/nested.rs), [prose](./examples/test/nested.md), and
+[output](./examples/reference/test/nested.md) files.
 
 ### Referencing annotations
 
