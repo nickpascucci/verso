@@ -1,0 +1,23 @@
+[
+  {
+    "body": "Verso is a literate programming tool.",
+    "id": "intro/description",
+    "file": "manual-notes.txt",
+    "line": 1,
+    "col": 0
+  },
+  {
+    "body": "print(\"This is the OLD version from the stored file.\")",
+    "id": "demo/greeting",
+    "file": "old-source.py",
+    "line": 5,
+    "col": 0
+  },
+  {
+    "body": "# This annotation only exists in the stored file.\n# It was written by hand and has no corresponding source.",
+    "id": "demo/handwritten-note",
+    "file": "manual-notes.txt",
+    "line": 10,
+    "col": 0
+  }
+]
