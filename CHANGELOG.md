@@ -41,6 +41,13 @@ updated throughout the repository.
 
 ## [Unreleased]
 
+## v0.4.0
+
+### Added
+
+- A new operator, `@?id.lastline`, allows inserting the line number where a fragment ended in the
+  woven output.
+
 ## v0.3.0
 
 ### Added
