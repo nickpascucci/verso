@@ -100,6 +100,7 @@ supports the following metadata insertion operators:
 4. _Quick location._ `@?id.loc` inserts the file name, starting line number, and column number for
    the fragment in the format `file (line:col)`. This is useful if you just want to quickly refer to
    the metadata without futzing with the formatting.
+5. _Last line number._ `@?id.lastline` inserts the line number on which the fragment ended.
 
 ### Weaving a document for human consumption
 
@@ -156,6 +157,7 @@ the right.)_
 - [@nickpascucci](https://github.com/nickpascucci/)
 - [@karlicoss](https://github.com/karlicoss/)
 - [@elidhu](https://github.com/elidhu/)
+- [@shanecelis](https://github.com/shanecelis)
 
 ## Future Work
 

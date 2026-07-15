@@ -20,6 +20,7 @@ const METADATA_SEPARATOR: char = '.';
 
 const FILENAME_REF: &str = "file";
 const LINE_NO_REF: &str = "line";
+const LAST_LINE_NO_REF: &str = "lastline";
 const COL_NO_REF: &str = "col";
 const LOC_REF: &str = "loc";
 const ABS_PATH_REF: &str = "abspath";
@@ -72,6 +73,8 @@ pub struct Fragment {
     pub id: String,
     pub file: String,
     pub line: usize,
+    #[serde(rename = "lastline")]
+    pub last_line: usize,
     pub col: usize,
 }
 
@@ -168,6 +171,7 @@ pub fn extract_fragments(
                         file: filename.to_owned(),
                         // The Fragment starts on the line after the opening symbol.
                         line: line + 1,
+                        last_line: line + 1,
                         col: 0,
                     });
                 }
@@ -242,6 +246,7 @@ pub fn extract_fragments(
         } else if let Some(fragment) = fragment_stack.last_mut() {
             fragment.body.push_str(content);
             fragment.body.push('\n');
+            fragment.last_line = line;
         }
     }
 
@@ -512,6 +517,7 @@ fn expand_metadata(
             Some(f) => match prop.to_ascii_lowercase().as_str() {
                 FILENAME_REF => Ok(f.file.to_owned()),
                 LINE_NO_REF => Ok(f.line.to_string()),
+                LAST_LINE_NO_REF => Ok(f.last_line.to_string()),
                 COL_NO_REF => Ok(f.col.to_string()),
                 LOC_REF => Ok(format!("{} ({}:{})", f.file, f.line, f.col)),
                 ABS_PATH_REF => Ok(format!("/{}", f.file)),
@@ -728,6 +734,37 @@ def main():
             "Unexpected ID {:?}",
             fragments[0].id
         );
+        assert_eq!(fragments[0].line, 5, "Unexpected start line {:?}", fragments[0].line);
+        assert_eq!(
+            fragments[0].last_line, 7,
+            "Unexpected last line {:?}",
+            fragments[0].last_line
+        );
+    }
+
+    #[test]
+    fn test_fragment_json_uses_lastline() {
+        let fragment = Fragment {
+            body: String::from("body"),
+            id: String::from("fragment-id"),
+            file: String::from("test.py"),
+            line: 2,
+            last_line: 4,
+            col: 0,
+        };
+
+        let json = serde_json::to_value(&fragment).expect("Expected Fragment to serialize");
+
+        assert!(
+            json.get("lastline").is_some(),
+            "Expected JSON to contain 'lastline', got {}",
+            json
+        );
+        assert!(
+            json.get("last_line").is_none(),
+            "Expected JSON not to contain 'last_line', got {}",
+            json
+        );
     }
 
     #[test]
@@ -905,6 +942,7 @@ Fragment 1
 @* [0-9]
 @?1.file (@?1.line:@?1.col)
 @?1.loc
+@?1.file [@?1.line-@?1.lastline]
 
 Another line.";
 
@@ -913,6 +951,7 @@ Another line.";
             body: String::from("{Example Code}"),
             file: String::from("example.code"),
             line: 1,
+            last_line: 3,
             col: 0,
         };
 
@@ -931,6 +970,7 @@ Another line.";
 {Example Code}
 example.code (1:0)
 example.code (1:0)
+example.code [1-3]
 
 Another line."
             )
@@ -946,6 +986,7 @@ Another line."
             body: String::from("{Example Code 1}"),
             file: String::from("example.code"),
             line: 1,
+            last_line: 1,
             col: 0,
         };
 
@@ -954,6 +995,7 @@ Another line."
             body: String::from("{Example Code 2}"),
             file: String::from("example.code"),
             line: 2,
+            last_line: 2,
             col: 0,
         };
 
@@ -998,6 +1040,7 @@ Another line.";
             body: String::from("{Example Code}"),
             file: String::from("example.code"),
             line: 1,
+            last_line: 1,
             col: 0,
         };
 
